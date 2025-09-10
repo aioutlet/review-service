@@ -1,0 +1,840 @@
+import Review from '../models/review.model.js';
+import ProductRating from '../models/productRating.model.js';
+import logger from '../utils/logger.js';
+import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
+import cacheService from './cache.service.js';
+import publisher from '../messaging/publisher.js';
+import axios from 'axios';
+import config from '../config/index.js';
+import { createOperationSpan } from '../observability/tracing/helpers.js';
+
+class ReviewService {
+  /**
+   * Create a new review
+   * @param {Object} reviewData - Review data
+   * @param {Object} user - User information
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Created review
+   */
+  async createReview(reviewData, user, correlationId) {
+    const operationSpan = createOperationSpan('review.create', {
+      'user.id': user.userId,
+      'product.id': reviewData.productId,
+      'review.rating': reviewData.rating,
+    });
+
+    const startTime = logger.operationStart('createReview', null, {
+      correlationId,
+      userId: user.userId,
+      metadata: { productId: reviewData.productId, rating: reviewData.rating },
+    });
+
+    try {
+      const log = logger.withCorrelationId(correlationId);
+
+      // Check if user already reviewed this product
+      const existingReview = await Review.findOne({
+        productId: reviewData.productId,
+        userId: user.userId,
+      });
+
+      if (existingReview) {
+        operationSpan.setStatus(2, 'User already reviewed product'); // ERROR status
+        throw new ConflictError('User has already reviewed this product');
+      }
+
+      // Validate product exists
+      await this.validateProduct(reviewData.productId, correlationId);
+
+      // Validate purchase if order reference provided
+      let isVerifiedPurchase = false;
+      if (reviewData.orderReference) {
+        isVerifiedPurchase = await this.validatePurchase(
+          user.userId,
+          reviewData.productId,
+          reviewData.orderReference,
+          correlationId
+        );
+      }
+
+      // Determine initial status
+      const status = this.determineInitialStatus(isVerifiedPurchase);
+
+      // Create review
+      const review = new Review({
+        ...reviewData,
+        userId: user.userId,
+        username: user.username,
+        isVerifiedPurchase,
+        status,
+        metadata: {
+          ...reviewData.metadata,
+          source: reviewData.source || 'web',
+        },
+      });
+
+      const savedReview = await review.save();
+
+      // Update product rating aggregate asynchronously
+      this.updateProductRating(reviewData.productId, correlationId).catch((err) => {
+        log.error('Failed to update product rating:', err);
+      });
+
+      // Publish event
+      await publisher.publishReviewCreated(
+        {
+          reviewId: savedReview._id,
+          productId: savedReview.productId,
+          userId: savedReview.userId,
+          rating: savedReview.rating,
+          status: savedReview.status,
+          isVerifiedPurchase: savedReview.isVerifiedPurchase,
+        },
+        correlationId
+      );
+
+      log.info('Review created successfully', {
+        reviewId: savedReview._id,
+        productId: reviewData.productId,
+        userId: user.userId,
+        status: savedReview.status,
+      });
+
+      // Log business event
+      logger.business('review_created', null, {
+        correlationId,
+        userId: user.userId,
+        metadata: {
+          reviewId: savedReview._id,
+          productId: reviewData.productId,
+          rating: savedReview.rating,
+          isVerifiedPurchase: savedReview.isVerifiedPurchase,
+        },
+      });
+
+      operationSpan.setStatus(1); // OK status
+      operationSpan.addEvent('review_created', {
+        'review.id': savedReview._id.toString(),
+        'review.status': savedReview.status,
+      });
+
+      logger.operationComplete('createReview', startTime, null, {
+        correlationId,
+        userId: user.userId,
+        metadata: { reviewId: savedReview._id, status: savedReview.status },
+      });
+
+      return savedReview;
+    } catch (error) {
+      operationSpan.setStatus(2, error.message); // ERROR status
+      operationSpan.addEvent('review_creation_failed', {
+        'error.name': error.name,
+        'error.message': error.message,
+      });
+
+      logger.operationFailed('createReview', startTime, error, null, {
+        correlationId,
+        userId: user.userId,
+        metadata: { productId: reviewData.productId },
+      });
+
+      throw error;
+    } finally {
+      operationSpan.end();
+    }
+  }
+
+  /**
+   * Get reviews for a product with filtering and pagination
+   * @param {String} productId - Product ID
+   * @param {Object} options - Query options
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Reviews and pagination info
+   */
+  async getProductReviews(productId, options = {}, correlationId) {
+    const operationSpan = createOperationSpan('review.get_product_reviews', {
+      'product.id': productId,
+      'query.page': options.page || 1,
+      'query.limit': options.limit || 20,
+    });
+
+    const startTime = logger.operationStart('getProductReviews', null, {
+      correlationId,
+      metadata: { productId, options: Object.keys(options) },
+    });
+
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        sortBy = 'metadata.createdAt',
+        sortOrder = 'desc',
+        status = 'approved',
+        rating,
+        verifiedOnly = false,
+        withMedia = false,
+        search,
+        userId,
+      } = options;
+
+      // Build filter
+      const filter = { productId };
+
+      // Status filter
+      if (Array.isArray(status)) {
+        filter.status = { $in: status };
+      } else {
+        filter.status = status;
+      }
+
+      // Rating filter
+      if (rating) {
+        if (Array.isArray(rating)) {
+          filter.rating = { $in: rating.map(Number) };
+        } else {
+          filter.rating = Number(rating);
+        }
+      }
+
+      // Verified purchase filter
+      if (verifiedOnly) {
+        filter.isVerifiedPurchase = true;
+      }
+
+      // Media filter
+      if (withMedia) {
+        filter.$or = [
+          { images: { $exists: true, $not: { $size: 0 } } },
+          { videos: { $exists: true, $not: { $size: 0 } } },
+        ];
+      }
+
+      // Search filter
+      if (search) {
+        filter.$text = { $search: search };
+      }
+
+      // User filter (for getting user's own reviews)
+      if (userId) {
+        filter.userId = userId;
+      }
+
+      // Build sort
+      const sort = {};
+      if (sortBy === 'helpfulness') {
+        sort['helpfulVotes.helpful'] = sortOrder === 'desc' ? -1 : 1;
+      } else if (sortBy === 'rating') {
+        sort.rating = sortOrder === 'desc' ? -1 : 1;
+        sort['metadata.createdAt'] = -1; // Secondary sort
+      } else {
+        sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      }
+
+      const skip = (page - 1) * limit;
+
+      // Execute queries in parallel
+      const [reviews, total] = await Promise.all([
+        Review.find(filter).sort(sort).skip(skip).limit(limit).select('-__v -helpfulVotes.userVotes').lean(),
+        Review.countDocuments(filter),
+      ]);
+
+      // Add virtual fields manually for lean queries
+      const enrichedReviews = reviews.map((review) => ({
+        ...review,
+        helpfulScore: this.calculateHelpfulScore(review.helpfulVotes),
+        totalVotes: review.helpfulVotes.helpful + review.helpfulVotes.notHelpful,
+        ageInDays: Math.floor((Date.now() - review.metadata.createdAt) / (1000 * 60 * 60 * 24)),
+      }));
+
+      const result = {
+        reviews: enrichedReviews,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1,
+        },
+        filters: {
+          productId,
+          status,
+          rating,
+          verifiedOnly,
+          withMedia,
+          search,
+        },
+      };
+
+      operationSpan.setStatus(1); // OK status
+      operationSpan.addEvent('reviews_retrieved', {
+        'reviews.count': enrichedReviews.length,
+        'reviews.total': total,
+      });
+
+      logger.operationComplete('getProductReviews', startTime, null, {
+        correlationId,
+        metadata: {
+          productId,
+          reviewsCount: enrichedReviews.length,
+          totalReviews: total,
+        },
+      });
+
+      return result;
+    } catch (error) {
+      operationSpan.setStatus(2, error.message); // ERROR status
+      operationSpan.addEvent('reviews_retrieval_failed', {
+        'error.name': error.name,
+        'error.message': error.message,
+      });
+
+      logger.operationFailed('getProductReviews', startTime, error, null, {
+        correlationId,
+        metadata: { productId },
+      });
+
+      throw error;
+    } finally {
+      operationSpan.end();
+    }
+  }
+
+  /**
+   * Update a review
+   * @param {String} reviewId - Review ID
+   * @param {Object} updateData - Update data
+   * @param {Object} user - User information
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Updated review
+   */
+  async updateReview(reviewId, updateData, user, correlationId) {
+    try {
+      const log = logger.withCorrelationId(correlationId);
+
+      const review = await Review.findById(reviewId);
+      if (!review) {
+        throw new NotFoundError('Review not found');
+      }
+
+      // Check ownership
+      if (review.userId !== user.userId && !user.isAdmin) {
+        throw new ForbiddenError('You can only update your own reviews');
+      }
+
+      // Validate update data
+      const allowedFields = ['rating', 'title', 'comment', 'images', 'videos'];
+      const updateFields = {};
+
+      allowedFields.forEach((field) => {
+        if (updateData[field] !== undefined) {
+          updateFields[field] = updateData[field];
+        }
+      });
+
+      // Update review
+      Object.assign(review, updateFields);
+      review.metadata.updatedAt = new Date();
+
+      // Reset status to pending if content changed significantly
+      if (updateData.rating !== undefined || updateData.comment !== undefined) {
+        review.status = 'pending';
+      }
+
+      const updatedReview = await review.save();
+
+      // Update product rating if rating changed
+      if (updateData.rating !== undefined) {
+        this.updateProductRating(review.productId, correlationId).catch((err) => {
+          log.error('Failed to update product rating:', err);
+        });
+      }
+
+      // Publish event
+      await publisher.publishReviewUpdated(
+        {
+          reviewId: updatedReview._id,
+          productId: updatedReview.productId,
+          userId: updatedReview.userId,
+          changes: Object.keys(updateFields),
+        },
+        correlationId
+      );
+
+      log.info('Review updated successfully', {
+        reviewId: updatedReview._id,
+        userId: user.userId,
+        changes: Object.keys(updateFields),
+      });
+
+      return updatedReview;
+    } catch (error) {
+      logger.error('Error updating review:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a review
+   * @param {String} reviewId - Review ID
+   * @param {Object} user - User information
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Boolean>} Success status
+   */
+  async deleteReview(reviewId, user, correlationId) {
+    try {
+      const log = logger.withCorrelationId(correlationId);
+
+      const review = await Review.findById(reviewId);
+      if (!review) {
+        throw new NotFoundError('Review not found');
+      }
+
+      // Check ownership or admin rights
+      if (review.userId !== user.userId && !user.isAdmin) {
+        throw new ForbiddenError('You can only delete your own reviews');
+      }
+
+      const productId = review.productId;
+      await Review.findByIdAndDelete(reviewId);
+
+      // Update product rating
+      this.updateProductRating(productId, correlationId).catch((err) => {
+        log.error('Failed to update product rating after deletion:', err);
+      });
+
+      // Publish event
+      await publisher.publishReviewDeleted(
+        {
+          reviewId,
+          productId,
+          userId: review.userId,
+        },
+        correlationId
+      );
+
+      log.info('Review deleted successfully', {
+        reviewId,
+        userId: user.userId,
+        productId,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Error deleting review:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vote on review helpfulness
+   * @param {String} reviewId - Review ID
+   * @param {String} userId - User ID
+   * @param {String} vote - Vote type ('helpful' or 'notHelpful')
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Updated review
+   */
+  async voteReviewHelpfulness(reviewId, userId, vote, correlationId) {
+    try {
+      const log = logger.withCorrelationId(correlationId);
+
+      if (!['helpful', 'notHelpful'].includes(vote)) {
+        throw new ValidationError('Vote must be either "helpful" or "notHelpful"');
+      }
+
+      const review = await Review.findById(reviewId);
+      if (!review) {
+        throw new NotFoundError('Review not found');
+      }
+
+      // Check if user is voting on their own review
+      if (review.userId === userId) {
+        throw new ForbiddenError('You cannot vote on your own review');
+      }
+
+      // Find existing vote
+      const existingVoteIndex = review.helpfulVotes.userVotes.findIndex((v) => v.userId === userId);
+
+      if (existingVoteIndex >= 0) {
+        // Update existing vote
+        const oldVote = review.helpfulVotes.userVotes[existingVoteIndex].vote;
+
+        if (oldVote === vote) {
+          // Remove vote if same vote
+          review.helpfulVotes.userVotes.splice(existingVoteIndex, 1);
+          review.helpfulVotes[oldVote]--;
+        } else {
+          // Change vote
+          review.helpfulVotes.userVotes[existingVoteIndex].vote = vote;
+          review.helpfulVotes.userVotes[existingVoteIndex].votedAt = new Date();
+          review.helpfulVotes[oldVote]--;
+          review.helpfulVotes[vote]++;
+        }
+      } else {
+        // Add new vote
+        review.helpfulVotes.userVotes.push({
+          userId,
+          vote,
+          votedAt: new Date(),
+        });
+        review.helpfulVotes[vote]++;
+      }
+
+      await review.save();
+
+      log.info('Review vote recorded', {
+        reviewId,
+        userId,
+        vote,
+        helpful: review.helpfulVotes.helpful,
+        notHelpful: review.helpfulVotes.notHelpful,
+      });
+
+      return review;
+    } catch (error) {
+      logger.error('Error voting on review:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get review by ID
+   * @param {String} reviewId - Review ID
+   * @param {String} userId - User ID (optional, for personalization)
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Review
+   */
+  async getReviewById(reviewId, userId = null, correlationId) {
+    try {
+      const review = await Review.findById(reviewId).lean();
+      if (!review) {
+        throw new NotFoundError('Review not found');
+      }
+
+      // Add computed fields
+      const enrichedReview = {
+        ...review,
+        helpfulScore: this.calculateHelpfulScore(review.helpfulVotes),
+        totalVotes: review.helpfulVotes.helpful + review.helpfulVotes.notHelpful,
+        ageInDays: Math.floor((Date.now() - review.metadata.createdAt) / (1000 * 60 * 60 * 24)),
+      };
+
+      // Add user-specific data if userId provided
+      if (userId) {
+        const userVote = review.helpfulVotes.userVotes.find((v) => v.userId === userId);
+        enrichedReview.userVote = userVote ? userVote.vote : null;
+        enrichedReview.isOwnReview = review.userId === userId;
+      }
+
+      return enrichedReview;
+    } catch (error) {
+      logger.error('Error getting review by ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update product rating aggregate
+   * @param {String} productId - Product ID
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Updated rating
+   */
+  async updateProductRating(productId, correlationId) {
+    try {
+      const log = logger.withCorrelationId(correlationId);
+
+      const pipeline = [
+        { $match: { productId, status: 'approved' } },
+        {
+          $group: {
+            _id: '$productId',
+            totalReviews: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+            ratingDistribution: { $push: '$rating' },
+            verifiedReviews: { $sum: { $cond: ['$isVerifiedPurchase', 1, 0] } },
+            verifiedRatingSum: { $sum: { $cond: ['$isVerifiedPurchase', '$rating', 0] } },
+            sentimentCounts: { $push: '$sentiment.label' },
+            totalHelpfulVotes: { $sum: '$helpfulVotes.helpful' },
+            reviewsWithMedia: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $gt: [{ $size: { $ifNull: ['$images', []] } }, 0] },
+                      { $gt: [{ $size: { $ifNull: ['$videos', []] } }, 0] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            averageReviewLength: { $avg: { $strLenCP: { $ifNull: ['$comment', ''] } } },
+            lastReviewDate: { $max: '$metadata.createdAt' },
+            firstReviewDate: { $min: '$metadata.createdAt' },
+          },
+        },
+      ];
+
+      const [result] = await Review.aggregate(pipeline);
+
+      if (result) {
+        // Calculate rating distribution
+        const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        result.ratingDistribution.forEach((rating) => {
+          distribution[rating]++;
+        });
+
+        // Calculate sentiment distribution
+        const sentiment = { positive: 0, neutral: 0, negative: 0 };
+        result.sentimentCounts.forEach((label) => {
+          if (label && sentiment[label] !== undefined) {
+            sentiment[label]++;
+          }
+        });
+
+        // Calculate verified purchase rating
+        const verifiedRating = result.verifiedReviews > 0 ? result.verifiedRatingSum / result.verifiedReviews : null;
+
+        // Calculate trends (last 7 and 30 days)
+        const trends = await this.calculateReviewTrends(productId);
+
+        const ratingData = {
+          productId,
+          averageRating: Math.round(result.averageRating * 10) / 10,
+          totalReviews: result.totalReviews,
+          ratingDistribution: distribution,
+          verifiedPurchaseRating: verifiedRating ? Math.round(verifiedRating * 10) / 10 : null,
+          verifiedReviewsCount: result.verifiedReviews,
+          sentiment,
+          qualityMetrics: {
+            averageHelpfulScore:
+              result.totalReviews > 0 ? Math.round((result.totalHelpfulVotes / result.totalReviews) * 100) / 100 : 0,
+            totalHelpfulVotes: result.totalHelpfulVotes,
+            reviewsWithMedia: result.reviewsWithMedia,
+            averageReviewLength: Math.round(result.averageReviewLength || 0),
+          },
+          trends,
+          lastReviewDate: result.lastReviewDate,
+          firstReviewDate: result.firstReviewDate,
+          lastUpdated: new Date(),
+        };
+
+        const updatedRating = await ProductRating.findOneAndUpdate({ productId }, ratingData, {
+          upsert: true,
+          new: true,
+        });
+
+        // Update cache
+        await cacheService.setProductRating(
+          productId,
+          {
+            averageRating: ratingData.averageRating,
+            totalReviews: ratingData.totalReviews,
+            ratingDistribution: distribution,
+            verifiedPurchaseRating: ratingData.verifiedPurchaseRating,
+          },
+          correlationId
+        );
+
+        // Publish rating updated event
+        await publisher.publishRatingUpdated(
+          {
+            productId,
+            averageRating: ratingData.averageRating,
+            totalReviews: ratingData.totalReviews,
+            ratingDistribution: distribution,
+          },
+          correlationId
+        );
+
+        log.info('Product rating updated', {
+          productId,
+          averageRating: ratingData.averageRating,
+          totalReviews: ratingData.totalReviews,
+        });
+
+        return updatedRating;
+      } else {
+        // No reviews found, set default rating
+        const defaultRating = {
+          productId,
+          averageRating: 0,
+          totalReviews: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          verifiedPurchaseRating: null,
+          verifiedReviewsCount: 0,
+          sentiment: { positive: 0, neutral: 0, negative: 0 },
+          qualityMetrics: {
+            averageHelpfulScore: 0,
+            totalHelpfulVotes: 0,
+            reviewsWithMedia: 0,
+            averageReviewLength: 0,
+          },
+          trends: {
+            last30Days: { totalReviews: 0, averageRating: 0 },
+            last7Days: { totalReviews: 0, averageRating: 0 },
+          },
+          lastUpdated: new Date(),
+        };
+
+        await ProductRating.findOneAndUpdate({ productId }, defaultRating, { upsert: true, new: true });
+
+        // Clear cache
+        await cacheService.deleteProductRating(productId, correlationId);
+
+        return defaultRating;
+      }
+    } catch (error) {
+      logger.error('Error updating product rating:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate review trends for last 7 and 30 days
+   * @param {String} productId - Product ID
+   * @returns {Promise<Object>} Trends data
+   */
+  async calculateReviewTrends(productId) {
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [trends7, trends30] = await Promise.all([
+      Review.aggregate([
+        {
+          $match: {
+            productId,
+            status: 'approved',
+            'metadata.createdAt': { $gte: last7Days },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+          },
+        },
+      ]),
+      Review.aggregate([
+        {
+          $match: {
+            productId,
+            status: 'approved',
+            'metadata.createdAt': { $gte: last30Days },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+          },
+        },
+      ]),
+    ]);
+
+    return {
+      last7Days: {
+        totalReviews: trends7[0]?.totalReviews || 0,
+        averageRating: trends7[0]?.averageRating ? Math.round(trends7[0].averageRating * 10) / 10 : 0,
+      },
+      last30Days: {
+        totalReviews: trends30[0]?.totalReviews || 0,
+        averageRating: trends30[0]?.averageRating ? Math.round(trends30[0].averageRating * 10) / 10 : 0,
+      },
+    };
+  }
+
+  /**
+   * Calculate helpful score percentage
+   * @param {Object} helpfulVotes - Helpful votes object
+   * @returns {Number} Helpful score percentage
+   */
+  calculateHelpfulScore(helpfulVotes) {
+    const total = helpfulVotes.helpful + helpfulVotes.notHelpful;
+    return total > 0 ? Math.round((helpfulVotes.helpful / total) * 100) : 0;
+  }
+
+  /**
+   * Determine initial review status
+   * @param {Boolean} isVerifiedPurchase - Is verified purchase
+   * @returns {String} Status
+   */
+  determineInitialStatus(isVerifiedPurchase) {
+    if (config.review.autoApproveVerified && isVerifiedPurchase) {
+      return 'approved';
+    }
+    return config.review.moderationRequired ? 'pending' : 'approved';
+  }
+
+  /**
+   * Validate product exists
+   * @param {String} productId - Product ID
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Boolean>} Validation result
+   */
+  async validateProduct(productId, correlationId) {
+    try {
+      const response = await axios.get(
+        `${config.externalServices.productService}/api/v1/internal/products/${productId}/exists`,
+        {
+          headers: {
+            'X-Correlation-ID': correlationId,
+          },
+          timeout: 5000,
+        }
+      );
+
+      if (!response.data.exists) {
+        throw new NotFoundError('Product not found');
+      }
+
+      return true;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new NotFoundError('Product not found');
+      }
+      logger.error('Error validating product:', error);
+      // Don't fail review creation if product service is down
+      return true;
+    }
+  }
+
+  /**
+   * Validate purchase
+   * @param {String} userId - User ID
+   * @param {String} productId - Product ID
+   * @param {String} orderReference - Order reference
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Boolean>} Validation result
+   */
+  async validatePurchase(userId, productId, orderReference, correlationId) {
+    try {
+      const response = await axios.post(
+        `${config.externalServices.orderService}/api/v1/internal/orders/validate-purchase`,
+        {
+          userId,
+          productId,
+          orderReference,
+        },
+        {
+          headers: {
+            'X-Correlation-ID': correlationId,
+          },
+          timeout: 5000,
+        }
+      );
+
+      return response.data.isValid || false;
+    } catch (error) {
+      logger.error('Error validating purchase:', error);
+      // Return false if order service is down or validation fails
+      return false;
+    }
+  }
+}
+
+export default new ReviewService();
