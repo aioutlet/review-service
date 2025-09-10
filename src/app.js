@@ -341,27 +341,6 @@ import { shutdownTracing } from './observability/tracing/setup.js';
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Graceful shutdown handler
-async function gracefulShutdown(signal) {
-  logger.info(`Received ${signal}. Starting graceful shutdown...`);
-
-  try {
-    // Shutdown tracing
-    await shutdownTracing();
-
-    // Close RabbitMQ connection
-    if (rabbitmqService && typeof rabbitmqService.close === 'function') {
-      await rabbitmqService.close();
-    }
-
-    logger.info('Graceful shutdown completed');
-    process.exit(0);
-  } catch (error) {
-    logger.error('Error during graceful shutdown:', error);
-    process.exit(1);
-  }
-}
-
 // Handle uncaught exceptions and rejections
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', {

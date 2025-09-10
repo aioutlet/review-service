@@ -3,7 +3,12 @@ import ProductRating from '../models/productRating.model.js';
 import logger from '../utils/logger.js';
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
 import cacheService from './cache.service.js';
-import publisher from '../messaging/publisher.js';
+import {
+  publishReviewCreated,
+  publishReviewUpdated,
+  publishReviewDeleted,
+  publishRatingUpdated,
+} from '../messaging/publisher.js';
 import axios from 'axios';
 import config from '../config/index.js';
 import { createOperationSpan } from '../observability/tracing/helpers.js';
@@ -81,7 +86,7 @@ class ReviewService {
       });
 
       // Publish event
-      await publisher.publishReviewCreated(
+      await publishReviewCreated(
         {
           reviewId: savedReview._id,
           productId: savedReview.productId,
@@ -351,7 +356,7 @@ class ReviewService {
       }
 
       // Publish event
-      await publisher.publishReviewUpdated(
+      await publishReviewUpdated(
         {
           reviewId: updatedReview._id,
           productId: updatedReview.productId,
@@ -404,7 +409,7 @@ class ReviewService {
       });
 
       // Publish event
-      await publisher.publishReviewDeleted(
+      await publishReviewDeleted(
         {
           reviewId,
           productId,
@@ -638,7 +643,7 @@ class ReviewService {
         );
 
         // Publish rating updated event
-        await publisher.publishRatingUpdated(
+        await publishRatingUpdated(
           {
             productId,
             averageRating: ratingData.averageRating,

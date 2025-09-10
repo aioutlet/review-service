@@ -325,8 +325,14 @@ export const verifyApiKey = (req, res, next) => {
   }
 };
 
+/**
+ * Alias for verifyToken - main authentication middleware
+ */
+export const authenticateUser = verifyToken;
+
 export default {
   verifyToken,
+  authenticateUser,
   optionalAuth,
   requireAdmin,
   requireRole,

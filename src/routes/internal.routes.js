@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import internalController from '../controllers/internal.controller.js';
+import { bulkDeleteReviews, getInternalStats } from '../controllers/internal.controller.js';
 import { authenticateUser, requireRole } from '../middlewares/auth.middleware.js';
 import { rateLimiter } from '../middlewares/rateLimit.middleware.js';
 
@@ -18,13 +18,13 @@ router.use(requireRole(['admin']));
 router.post(
   '/reviews/bulk-delete',
   rateLimiter({ windowMs: 60 * 1000, max: 10 }), // 10 bulk operations per minute
-  internalController.bulkDeleteReviews
+  bulkDeleteReviews
 );
 
 router.get(
   '/stats',
   rateLimiter({ windowMs: 60 * 1000, max: 20 }), // 20 stats requests per minute
-  internalController.getInternalStats
+  getInternalStats
 );
 
 export default router;

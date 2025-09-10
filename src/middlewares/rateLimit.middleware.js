@@ -234,6 +234,9 @@ export const createCombinedRateLimit = (options = {}) => {
   return middlewares;
 };
 
+// Alias for createRateLimiter function to match import expectations
+export const rateLimiter = createRateLimiter;
+
 // Export default object with common rate limiters
 export default {
   general: generalRateLimit,
@@ -247,6 +250,7 @@ export default {
   analytics: analyticsRateLimit,
   speed: generalSpeedLimit,
   createRateLimiter,
+  rateLimiter,
   createSpeedLimiter,
   createCombinedRateLimit,
 };

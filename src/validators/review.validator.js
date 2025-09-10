@@ -1,4 +1,76 @@
 import mongoose from 'mongoose';
+import { body, param, query } from 'express-validator';
+
+/**
+ * Validation rules for creating a review
+ */
+export const validateCreateReview = [
+  body('productId')
+    .notEmpty()
+    .withMessage('Product ID is required')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Product ID must be between 1 and 100 characters'),
+
+  body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be an integer between 1 and 5'),
+
+  body('title')
+    .trim()
+    .isLength({ min: 5, max: 200 })
+    .withMessage('Title must be between 5 and 200 characters')
+    .matches(/^[^<>{}[\]\\\/\^\$\|\?\*\+\(\)]*$/)
+    .withMessage('Title contains invalid characters'),
+
+  body('content').trim().isLength({ min: 10, max: 2000 }).withMessage('Content must be between 10 and 2000 characters'),
+
+  body('images').optional().isArray().withMessage('Images must be an array'),
+
+  body('images.*').optional().isURL().withMessage('Each image must be a valid URL'),
+];
+
+/**
+ * Validation rules for updating a review
+ */
+export const validateUpdateReview = [
+  param('reviewId').isMongoId().withMessage('Invalid review ID'),
+
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ min: 5, max: 200 })
+    .withMessage('Title must be between 5 and 200 characters')
+    .matches(/^[^<>{}[\]\\\/\^\$\|\?\*\+\(\)]*$/)
+    .withMessage('Title contains invalid characters'),
+
+  body('content')
+    .optional()
+    .trim()
+    .isLength({ min: 10, max: 2000 })
+    .withMessage('Content must be between 10 and 2000 characters'),
+
+  body('rating').optional().isInt({ min: 1, max: 5 }).withMessage('Rating must be an integer between 1 and 5'),
+
+  body('images').optional().isArray().withMessage('Images must be an array'),
+
+  body('images.*').optional().isURL().withMessage('Each image must be a valid URL'),
+];
+
+/**
+ * Validation rules for review votes
+ */
+export const validateReviewVote = [
+  param('reviewId').isMongoId().withMessage('Invalid review ID'),
+
+  body('voteType')
+    .isIn(['helpful', 'notHelpful', 'spam'])
+    .withMessage('Vote type must be helpful, notHelpful, or spam'),
+];
+
+/**
+ * Validation rules for rating
+ */
+export const validateRating = [
+  body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be an integer between 1 and 5'),
+];
 
 /**
  * Review input validation utility
