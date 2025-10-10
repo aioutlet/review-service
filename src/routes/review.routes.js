@@ -15,7 +15,6 @@ import {
 } from '../controllers/review.controller.js';
 import { authenticateUser, optionalAuth } from '../middlewares/auth.middleware.js';
 import { validateRequest } from '../middlewares/validation.middleware.js';
-import { rateLimiter } from '../middlewares/rateLimit.middleware.js';
 
 const router = express.Router();
 
@@ -27,7 +26,6 @@ router.get('/:reviewId', optionalAuth, getReviewById);
 router.post(
   '/',
   authenticateUser,
-  rateLimiter({ windowMs: 15 * 60 * 1000, max: 10 }), // 10 reviews per 15 minutes
   createReview
 );
 
@@ -38,7 +36,6 @@ router.delete('/:reviewId', authenticateUser, deleteReview);
 router.post(
   '/:reviewId/vote',
   authenticateUser,
-  rateLimiter({ windowMs: 60 * 1000, max: 20 }), // 20 votes per minute
   voteOnReview
 );
 

@@ -14,7 +14,6 @@ import connectRedis from './config/redis.js';
 import logger from './utils/logger.js';
 import { errorHandler } from './utils/errors.js';
 import correlationIdMiddleware from './middlewares/correlationId.middleware.js';
-import rateLimitMiddleware from './middlewares/rateLimit.middleware.js';
 import { tracingMiddleware, tracingErrorMiddleware, performanceMiddleware } from './middlewares/tracing.middleware.js';
 
 // Import routes
@@ -29,7 +28,6 @@ import { health, readiness, liveness, metrics } from './controllers/operational.
 // Import messaging
 import rabbitmqService from './messaging/rabbitmq.js';
 
-const { general: generalRateLimit } = rateLimitMiddleware;
 const app = express();
 
 // Trust proxy for accurate IP addresses
@@ -122,7 +120,6 @@ app.use(
 app.use(correlationIdMiddleware);
 app.use(tracingMiddleware);
 app.use(performanceMiddleware);
-app.use(generalRateLimit);
 
 // Logging middleware
 app.use(
