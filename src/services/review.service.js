@@ -1,6 +1,6 @@
 import Review from '../models/review.model.js';
 import ProductRating from '../models/productRating.model.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
 import cacheService from './cache.service.js';
 import {

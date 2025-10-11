@@ -4,7 +4,7 @@
  */
 
 import reviewService from '../services/review.service.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 import { createOperationSpan } from '../observability/tracing/helpers.js';
 
 /**

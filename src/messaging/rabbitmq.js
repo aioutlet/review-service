@@ -1,7 +1,7 @@
 import amqp from 'amqplib';
 import config from '../config/index.js';
-import logger from '../utils/logger.js';
-import consumer from './consumer.js';
+import logger from '../observability/index.js';
+import * as consumer from './consumer.js';
 
 class RabbitMQService {
   constructor() {

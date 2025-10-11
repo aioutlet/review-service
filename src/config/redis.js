@@ -1,6 +1,6 @@
 import { createClient } from 'redis';
 import config from './index.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 
 let redisClient = null;
 let isConnected = false;

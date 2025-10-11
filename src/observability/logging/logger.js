@@ -316,6 +316,23 @@ class Logger {
   }
 
   /**
+   * Create a logger with a bound correlation ID
+   * Used for request-scoped logging
+   */
+  withCorrelationId(correlationId) {
+    return {
+      debug: (message, req = null, additionalData = {}) =>
+        this.debug(message, req, { ...additionalData, correlationId }),
+      info: (message, req = null, additionalData = {}) => this.info(message, req, { ...additionalData, correlationId }),
+      warn: (message, req = null, additionalData = {}) => this.warn(message, req, { ...additionalData, correlationId }),
+      error: (message, req = null, additionalData = {}) =>
+        this.error(message, req, { ...additionalData, correlationId }),
+      fatal: (message, req = null, additionalData = {}) =>
+        this.fatal(message, req, { ...additionalData, correlationId }),
+    };
+  }
+
+  /**
    * Validate log entry against unified schema
    */
   validateEntry(entry) {

@@ -1,17 +1,17 @@
-// Initialize OpenTelemetry tracing before other imports
-import { initializeTracing } from './observability/tracing/setup.js';
-initializeTracing();
-
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 
+// Initialize OpenTelemetry tracing after environment is loaded
+import { initializeTracing } from './observability/tracing/setup.js';
+initializeTracing();
+
 import config from './config/index.js';
 import connectDB from './config/database.js';
 import connectRedis from './config/redis.js';
-import logger from './utils/logger.js';
+import logger from './observability/index.js';
 import { errorHandler } from './utils/errors.js';
 import correlationIdMiddleware from './middlewares/correlationId.middleware.js';
 import { tracingMiddleware, tracingErrorMiddleware, performanceMiddleware } from './middlewares/tracing.middleware.js';

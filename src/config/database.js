@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import config from './index.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 
 let isConnected = false;
 

@@ -4,7 +4,7 @@
  */
 
 import { createOperationSpan, getTracingContext } from '../observability/tracing/helpers.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 
 /**
  * Middleware to add tracing context to requests

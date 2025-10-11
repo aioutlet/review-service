@@ -1,4 +1,4 @@
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 import reviewService from '../services/review.service.js';
 import cacheService from '../services/cache.service.js';
 import Review from '../models/review.model.js';

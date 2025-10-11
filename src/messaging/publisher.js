@@ -1,6 +1,6 @@
 import rabbitmqService from './rabbitmq.js';
 import config from '../config/index.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 
 /**
  * Publish review created event

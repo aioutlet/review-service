@@ -5,7 +5,7 @@
 
 import mongoose from 'mongoose';
 import redisClient from '../config/redis.js';
-import logger from '../utils/logger.js';
+import logger from '../observability/index.js';
 import config from '../config/index.js';
 
 /**
