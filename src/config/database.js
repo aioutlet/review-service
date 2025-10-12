@@ -2,57 +2,50 @@ import mongoose from 'mongoose';
 import config from './index.js';
 import logger from '../observability/index.js';
 
-let isConnected = false;
-
 const connectDB = async () => {
-  if (isConnected) {
-    logger.info('MongoDB already connected');
-    return;
-  }
-
   try {
+    // MONGODB_URI is already validated by config.validator.js at startup
+    const mongodb_uri = config.database.uri;
+
+    // Set global promise library
+    mongoose.Promise = global.Promise;
+
+    // Set strictQuery to false to prepare for Mongoose 7
     mongoose.set('strictQuery', false);
 
-    const conn = await mongoose.connect(config.database.uri, config.database.options);
+    // Connect to MongoDB with connection options
+    const conn = await mongoose.connect(mongodb_uri, config.database.options);
 
-    isConnected = true;
-
-    logger.info('MongoDB connected successfully', {
-      host: conn.connection.host,
-      port: conn.connection.port,
-      database: conn.connection.name,
-    });
+    logger.info(`MongoDB connected: ${conn.connection.host}:${conn.connection.port}/${conn.connection.name}`);
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
-      logger.error('MongoDB connection error:', err);
-      isConnected = false;
+      logger.error(`MongoDB connection error: ${err.message}`);
     });
 
     mongoose.connection.on('disconnected', () => {
       logger.warn('MongoDB disconnected');
-      isConnected = false;
     });
 
     mongoose.connection.on('reconnected', () => {
       logger.info('MongoDB reconnected');
-      isConnected = true;
     });
 
     // Graceful shutdown
     process.on('SIGINT', async () => {
       try {
         await mongoose.connection.close();
-        logger.info('MongoDB connection closed through app termination');
+        logger.info('MongoDB connection closed due to application termination');
         process.exit(0);
-      } catch (err) {
-        logger.error('Error closing MongoDB connection:', err);
+      } catch (error) {
+        logger.error(`Error during MongoDB disconnection: ${error.message}`);
         process.exit(1);
       }
     });
+
+    return conn;
   } catch (error) {
-    logger.error('MongoDB connection failed:', error);
-    isConnected = false;
+    logger.error(`Error occurred while connecting to MongoDB: ${error.message}`);
     throw error;
   }
 };

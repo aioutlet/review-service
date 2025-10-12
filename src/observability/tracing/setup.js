@@ -32,10 +32,10 @@ export function initializeTracing() {
     });
 
     sdk.start();
-    console.log('OpenTelemetry tracing initialized');
+    console.log('[TRACING] ✅ OpenTelemetry tracing initialized successfully');
     return true;
   } catch (error) {
-    console.warn('Failed to initialize OpenTelemetry:', error.message);
+    console.warn('[TRACING] ⚠️  Failed to initialize OpenTelemetry:', error.message);
     return false;
   }
 }

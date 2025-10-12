@@ -188,9 +188,8 @@ export function createConsoleFormat(config) {
       const unifiedEntry = createUnifiedLogEntry(config, info);
       const message = formatConsoleMessage(unifiedEntry);
 
-      // Colorize for local and development environments
-      const shouldColorize = config.environment === 'development' || config.environment === 'local';
-      return shouldColorize ? colorizeLevel(unifiedEntry.level.toLowerCase(), message) : message;
+      // Always colorize console output for better readability
+      return colorizeLevel(message, unifiedEntry.level.toLowerCase());
     })
   );
 }

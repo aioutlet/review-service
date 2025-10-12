@@ -233,10 +233,12 @@ app.use(errorHandler);
  */
 async function startServer() {
   try {
-    logger.info('Starting Review Service...', {
-      environment: config.env,
-      port: config.server.port,
-      host: config.server.host,
+    logger.info('Starting Review Service...', null, {
+      metadata: {
+        environment: config.env,
+        port: config.server.port,
+        host: config.server.host,
+      },
     });
 
     // Initialize databases
@@ -253,43 +255,44 @@ async function startServer() {
 
     // Start HTTP server
     const server = app.listen(config.server.port, config.server.host, () => {
-      logger.info('🚀 Review service started successfully', {
-        host: config.server.host,
-        port: config.server.port,
-        environment: config.env,
-        nodeVersion: process.version,
-        platform: process.platform,
-        architecture: process.arch,
-        processId: process.pid,
-        uptime: process.uptime(),
+      logger.info('🚀 Review service started successfully', null, {
+        metadata: {
+          host: config.server.host,
+          port: config.server.port,
+          environment: config.env,
+          nodeVersion: process.version,
+          platform: process.platform,
+          architecture: process.arch,
+          processId: process.pid,
+          uptime: process.uptime(),
+        },
       });
 
       // Log service URLs
       const baseUrl = `http://${config.server.host}:${config.server.port}`;
-      logger.info('Service endpoints available:', {
-        health: `${baseUrl}/health`,
-        api: `${baseUrl}/api/v1`,
-        documentation: `${baseUrl}/api`,
-        metrics: `${baseUrl}/metrics`,
+      logger.info('Service endpoints available:', null, {
+        metadata: {
+          health: `${baseUrl}/health`,
+          api: `${baseUrl}/api/v1`,
+          documentation: `${baseUrl}/api`,
+          metrics: `${baseUrl}/metrics`,
+        },
       });
     });
 
     // Handle server errors
     server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
-        logger.error(`Port ${config.server.port} is already in use`);
+        logger.error(`Port ${config.server.port} is already in use`, null, { error });
       } else {
-        logger.error('Server error:', error);
+        logger.error('Server error', null, { error });
       }
       process.exit(1);
     });
 
     return server;
   } catch (error) {
-    logger.error('Failed to start server:', {
-      error: error.message,
-      stack: error.stack,
-    });
+    logger.error('Failed to start server', null, { error });
     process.exit(1);
   }
 }
@@ -323,10 +326,7 @@ const gracefulShutdown = async (signal) => {
     logger.info('Graceful shutdown completed successfully');
     process.exit(0);
   } catch (error) {
-    logger.error('Error during graceful shutdown:', {
-      error: error.message,
-      stack: error.stack,
-    });
+    logger.error('Error during graceful shutdown', null, { error });
     clearTimeout(timeout);
     process.exit(1);
   }
@@ -340,25 +340,21 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions and rejections
 process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', {
-    error: error.message,
-    stack: error.stack,
-  });
+  logger.error('Uncaught Exception', null, { error });
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', {
-    promise,
+  logger.error('Unhandled Rejection', null, {
+    error: reason,
+    metadata: { promise: String(promise) },
     reason: reason?.message || reason,
     stack: reason?.stack,
   });
   process.exit(1);
 });
 
-// Start the server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  startServer();
-}
+// Start the server (server.js ensures env is loaded before importing this)
+await startServer();
 
 export default app;

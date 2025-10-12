@@ -15,65 +15,36 @@ class Logger {
     const serviceName = process.env.SERVICE_NAME || config.serviceName || envConfig.serviceName;
 
     // Merge configurations: env vars > passed config > env defaults > global defaults
+    // All values are overridden by environment variables
     this.config = {
       ...DEFAULT_CONFIG,
       ...envConfig,
       ...config,
       // Override with environment variables
       serviceName: serviceName,
-      version: this._getServiceVersion(),
+      version: process.env.SERVICE_VERSION || '1.0.0',
       environment: environment,
       logLevel: process.env.LOG_LEVEL || config.logLevel || envConfig.logLevel,
       format: process.env.LOG_FORMAT || config.format || envConfig.format,
-      enableConsole: this._parseBoolean(process.env.LOG_TO_CONSOLE, envConfig.enableConsole),
-      enableFile: this._parseBoolean(process.env.LOG_TO_FILE, envConfig.enableFile),
-      enableTracing: this._parseBoolean(process.env.ENABLE_TRACING, envConfig.enableTracing),
-      filePath: process.env.LOG_FILE_PATH || config.filePath || this._getDefaultLogPath(environment, serviceName),
+      enableConsole: process.env.LOG_TO_CONSOLE === 'true',
+      enableFile: process.env.LOG_TO_FILE === 'true',
+      enableTracing: process.env.ENABLE_TRACING === 'true',
+      filePath: process.env.LOG_FILE_PATH || config.filePath || `./logs/${serviceName}.log`,
     };
+
+    // Force disable console and file logging in test environment
+    if (environment === 'test') {
+      this.config.enableConsole = false;
+      this.config.enableFile = false;
+    }
 
     // Initialize Winston logger
     this._initializeWinston();
 
-    // Log initialization
-    this.info('Logger initialized', null, {
-      operation: 'logger_initialization',
-      metadata: {
-        config: {
-          ...this.config,
-          // Don't log sensitive paths in production
-          filePath: this.config.environment === 'production' ? '[REDACTED]' : this.config.filePath,
-        },
-      },
-    });
-  }
-
-  /**
-   * Get service version from package.json
-   */
-  _getServiceVersion() {
-    try {
-      return process.env.SERVICE_VERSION || '1.0.0';
-    } catch {
-      return '1.0.0';
+    // Log initialization (skip for test environment)
+    if (environment !== 'test') {
+      console.log('[LOGGER] ✅ Logger initialized');
     }
-  }
-
-  /**
-   * Parse boolean from environment variable or return default
-   */
-  _parseBoolean(value, defaultValue) {
-    if (value === undefined || value === null) {
-      return defaultValue;
-    }
-    return value === 'true' || value === true;
-  }
-
-  /**
-   * Get default log file path based on environment
-   */
-  _getDefaultLogPath(environment, serviceName) {
-    const isDevelopment = environment === 'development';
-    return isDevelopment ? `./logs/${serviceName}.log` : `/app/logs/${serviceName}.log`;
   }
 
   /**
