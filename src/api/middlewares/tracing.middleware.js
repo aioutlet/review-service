@@ -3,8 +3,8 @@
  * Adds tracing context to requests and enhances observability
  */
 
-import { createOperationSpan, getTracingContext } from '../observability/tracing/helpers.js';
-import logger from '../observability/index.js';
+import { createOperationSpan, getTracingContext } from '../shared/observability/tracing/helpers.js';
+import logger from '../shared/observability/index.js';
 
 /**
  * Middleware to add tracing context to requests

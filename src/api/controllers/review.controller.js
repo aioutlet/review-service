@@ -3,9 +3,9 @@
  * Handles all review-related HTTP requests
  */
 
-import reviewService from '../services/review.service.js';
-import logger from '../observability/index.js';
-import { createOperationSpan } from '../observability/tracing/helpers.js';
+import reviewService from '../shared/services/review.service.js';
+import logger from '../shared/observability/index.js';
+import { createOperationSpan } from '../shared/observability/tracing/helpers.js';
 
 /**
  * Get error status code based on error type

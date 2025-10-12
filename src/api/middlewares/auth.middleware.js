@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
-import config from '../config/index.js';
-import logger from '../observability/index.js';
-import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
+import config from '../shared/config/index.js';
+import logger from '../shared/observability/index.js';
+import { UnauthorizedError, ForbiddenError } from '../shared/utils/errors.js';
 
 /**
  * Middleware to verify JWT token

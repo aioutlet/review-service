@@ -1,0 +1,29 @@
+# Review Service - Worker Container
+FROM node:20-alpine AS base
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY src/worker ./src/worker
+COPY src/shared ./src/shared
+COPY src/common ./src/common
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV SERVICE_TYPE=worker
+
+# No port exposure needed for worker
+
+# Health check - check if process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD ps aux | grep -v grep | grep worker.js || exit 1
+
+# Start worker
+CMD ["node", "src/worker/worker.js"]
