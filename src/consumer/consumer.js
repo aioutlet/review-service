@@ -1,5 +1,5 @@
 /**
- * Review Service Worker
+ * Review Service Consumer
  * Consumes and processes events from message broker
  */
 
@@ -15,14 +15,14 @@ const messageBroker = MessageBrokerFactory.create();
 let isShuttingDown = false;
 
 /**
- * Initialize and start the worker
+ * Initialize and start the consumer
  */
-async function startWorker() {
+async function startConsumer() {
   try {
-    logger.info('🔧 Starting Review Service Worker...', null, {
+    logger.info('🔧 Starting Review Service Consumer...', null, {
       metadata: {
         environment: config.env,
-        serviceType: 'worker',
+        serviceType: 'consumer',
         nodeVersion: process.version,
         processId: process.pid,
       },
@@ -47,15 +47,15 @@ async function startWorker() {
 
     // Start consuming messages
     await messageBroker.startConsuming();
-    logger.info('✅ Worker started successfully - Processing events', null, {
+    logger.info('✅ Consumer started successfully - Processing events', null, {
       metadata: {
         registeredHandlers: Object.keys(eventHandlers),
         queue: process.env.MESSAGE_BROKER_QUEUE || 'review-service.queue',
-        concurrency: process.env.WORKER_CONCURRENCY || 10,
+        concurrency: process.env.CONSUMER_CONCURRENCY || process.env.WORKER_CONCURRENCY || 10,
       },
     });
 
-    logger.info('📊 Worker Status:', null, {
+    logger.info('📊 Consumer Status:', null, {
       metadata: {
         status: 'running',
         uptime: process.uptime(),
@@ -63,7 +63,7 @@ async function startWorker() {
       },
     });
   } catch (error) {
-    logger.error('❌ Failed to start worker', null, { error });
+    logger.error('❌ Failed to start consumer', null, { error });
     process.exit(1);
   }
 }
@@ -109,17 +109,17 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions and rejections
 process.on('uncaughtException', (error) => {
-  logger.error('💥 Uncaught Exception in Worker', null, { error });
+  logger.error('💥 Uncaught Exception in Consumer', null, { error });
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('💥 Unhandled Rejection in Worker', null, {
+  logger.error('💥 Unhandled Rejection in Consumer', null, {
     error: reason,
     metadata: { promise: String(promise) },
   });
   gracefulShutdown('UNHANDLED_REJECTION');
 });
 
-// Start the worker
-startWorker();
+// Start the consumer
+startConsumer();
