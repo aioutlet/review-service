@@ -3,9 +3,9 @@
  * Handles internal endpoints for admin/ops/maintenance
  */
 
-import reviewService from '../shared/services/review.service.js';
-import logger from '../shared/observability/index.js';
-import { createOperationSpan } from '../shared/observability/tracing/helpers.js';
+import reviewService from '../../shared/services/review.service.js';
+import logger from '../../shared/observability/index.js';
+import { createOperationSpan } from '../../shared/observability/tracing/helpers.js';
 
 /**
  * Bulk delete reviews (admin only)

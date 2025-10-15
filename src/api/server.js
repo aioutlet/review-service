@@ -3,11 +3,11 @@
  * HTTP API for managing reviews and ratings
  */
 
-import '../common/observability/tracing/setup.js'; // Initialize tracing first
+import '../shared/observability/tracing/setup.js'; // Initialize tracing first
 import config from '../shared/config/index.js';
 import connectDB from '../shared/config/database.js';
 import connectRedis from '../shared/config/redis.js';
-import logger from '../common/observability/index.js';
+import logger from '../shared/observability/index.js';
 import createApp from './app.js';
 
 let server;

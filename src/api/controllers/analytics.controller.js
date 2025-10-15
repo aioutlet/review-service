@@ -3,9 +3,9 @@
  * Handles review analytics endpoints (ratings, stats, trends, etc.)
  */
 
-import reviewService from '../shared/services/review.service.js';
-import logger from '../shared/observability/index.js';
-import { createOperationSpan } from '../shared/observability/tracing/helpers.js';
+import reviewService from '../../shared/services/review.service.js';
+import logger from '../../shared/observability/index.js';
+import { createOperationSpan } from '../../shared/observability/tracing/helpers.js';
 
 /**
  * Get product review analytics (average rating, count, breakdown)

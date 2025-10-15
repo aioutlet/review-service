@@ -1,0 +1,202 @@
+[
+  {
+    "productId": "PLACEHOLDER_1",
+    "userId": "676f1234567890abcdef0001",
+    "username": "Sarah Johnson",
+    "rating": 5,
+    "title": "Absolutely love it!",
+    "comment": "This product exceeded all my expectations. The quality is outstanding and it arrived exactly as described. I've been using it for a few weeks now and couldn't be happier with my purchase. Highly recommend to anyone considering it!",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 24,
+      "notHelpful": 1,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.9,
+      "label": "positive",
+      "confidence": 0.95
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_1",
+    "userId": "676f1234567890abcdef0002",
+    "username": "Mike Chen",
+    "rating": 4,
+    "title": "Great value for money",
+    "comment": "Really good product overall. There are a couple of minor issues but nothing that would stop me from recommending it. The price point is excellent for what you get. Would buy again.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 15,
+      "notHelpful": 2,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.6,
+      "label": "positive",
+      "confidence": 0.85
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_1",
+    "userId": "676f1234567890abcdef0003",
+    "username": "Emily Rodriguez",
+    "rating": 5,
+    "title": "Perfect!",
+    "comment": "Exactly what I was looking for. Fits perfectly, looks great, and the quality is top-notch. Customer service was also excellent when I had a question before purchasing.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 18,
+      "notHelpful": 0,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.95,
+      "label": "positive",
+      "confidence": 0.98
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_2",
+    "userId": "676f1234567890abcdef0004",
+    "username": "David Kim",
+    "rating": 3,
+    "title": "Decent but not amazing",
+    "comment": "It's okay. Does the job but I expected a bit more for the price. The material feels a bit cheaper than I thought it would be. Still functional though.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 8,
+      "notHelpful": 3,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.1,
+      "label": "neutral",
+      "confidence": 0.7
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_2",
+    "userId": "676f1234567890abcdef0005",
+    "username": "Jessica Martinez",
+    "rating": 5,
+    "title": "Best purchase ever!",
+    "comment": "I've been looking for something like this for ages and this is perfect. The design is beautiful, it works flawlessly, and I get compliments on it all the time. Worth every penny!",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 31,
+      "notHelpful": 0,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.98,
+      "label": "positive",
+      "confidence": 0.99
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_3",
+    "userId": "676f1234567890abcdef0006",
+    "username": "Robert Taylor",
+    "rating": 4,
+    "title": "Solid choice",
+    "comment": "Good product with minor room for improvement. The features work well and it's reliable. Setup was easy and the instructions were clear. Would recommend to friends.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 12,
+      "notHelpful": 1,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.7,
+      "label": "positive",
+      "confidence": 0.88
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_3",
+    "userId": "676f1234567890abcdef0007",
+    "username": "Amanda Wilson",
+    "rating": 5,
+    "title": "Exceeded expectations",
+    "comment": "I was a bit skeptical at first but this product has really impressed me. The attention to detail is remarkable and it's clear that quality was a priority. It's become an essential part of my daily routine.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 22,
+      "notHelpful": 0,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.92,
+      "label": "positive",
+      "confidence": 0.96
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_4",
+    "userId": "676f1234567890abcdef0008",
+    "username": "Chris Anderson",
+    "rating": 4,
+    "title": "Happy with my purchase",
+    "comment": "Good quality and arrived quickly. The only reason I'm not giving 5 stars is that the color was slightly different from the photos, but still looks nice. Overall satisfied.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 9,
+      "notHelpful": 1,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.65,
+      "label": "positive",
+      "confidence": 0.82
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_5",
+    "userId": "676f1234567890abcdef0009",
+    "username": "Lisa Thompson",
+    "rating": 5,
+    "title": "Amazing quality!",
+    "comment": "The craftsmanship is excellent and you can tell this was made with care. It's stylish, functional, and durable. I've recommended it to several friends already and they all love it too.",
+    "isVerifiedPurchase": true,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 28,
+      "notHelpful": 0,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.94,
+      "label": "positive",
+      "confidence": 0.97
+    }
+  },
+  {
+    "productId": "PLACEHOLDER_5",
+    "userId": "676f1234567890abcdef0010",
+    "username": "Kevin Brown",
+    "rating": 3,
+    "title": "It's fine",
+    "comment": "Does what it's supposed to do. Nothing special but gets the job done. I probably wouldn't buy it again but it serves its purpose for now.",
+    "isVerifiedPurchase": false,
+    "status": "approved",
+    "helpfulVotes": {
+      "helpful": 5,
+      "notHelpful": 4,
+      "userVotes": []
+    },
+    "sentiment": {
+      "score": 0.0,
+      "label": "neutral",
+      "confidence": 0.75
+    }
+  }
+]

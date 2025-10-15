@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator';
-import logger from '../shared/observability/index.js';
+import logger from '../../shared/observability/index.js';
 
 /**
  * Middleware to validate request data using express-validator

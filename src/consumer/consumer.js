@@ -3,11 +3,11 @@
  * Consumes and processes events from message broker
  */
 
-import '../common/observability/tracing/setup.js'; // Initialize tracing first
+import '../shared/observability/tracing/setup.js'; // Initialize tracing first
 import config from '../shared/config/index.js';
 import connectDB from '../shared/config/database.js';
 import connectRedis from '../shared/config/redis.js';
-import logger from '../common/observability/index.js';
+import logger from '../shared/observability/index.js';
 import MessageBrokerFactory from '../shared/messaging/MessageBrokerFactory.js';
 import eventHandlers from './handlers/index.js';
 

@@ -21,7 +21,9 @@
     "build": "echo 'No build step required for Node.js'",
     "prod": "NODE_ENV=production node src/api/server.js",
     "prod:api": "NODE_ENV=production node src/api/server.js",
-    "prod:consumer": "NODE_ENV=production node src/consumer/consumer.js"
+    "prod:consumer": "NODE_ENV=production node src/consumer/consumer.js",
+    "seed": "node database/scripts/seed.js",
+    "clear": "node database/scripts/clear.js"
   },
   "keywords": [
     "review",

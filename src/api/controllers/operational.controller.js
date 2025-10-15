@@ -4,9 +4,9 @@
  */
 
 import mongoose from 'mongoose';
-import redisClient from '../shared/config/redis.js';
-import logger from '../shared/observability/index.js';
-import config from '../shared/config/index.js';
+import redisClient from '../../shared/config/redis.js';
+import logger from '../../shared/observability/index.js';
+import config from '../../shared/config/index.js';
 
 /**
  * Basic health check endpoint

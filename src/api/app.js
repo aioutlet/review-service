@@ -10,7 +10,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 
 import config from '../shared/config/index.js';
-import logger from '../common/observability/index.js';
+import logger from '../shared/observability/index.js';
 import { errorHandler } from '../shared/utils/errors.js';
 import correlationIdMiddleware from './middlewares/correlationId.middleware.js';
 import { tracingMiddleware, tracingErrorMiddleware, performanceMiddleware } from './middlewares/tracing.middleware.js';
