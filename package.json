@@ -53,7 +53,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.5.0",
     "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.0.2",
     "redis": "^4.6.8",
     "uuid": "^9.0.0",
     "winston": "^3.10.0"
