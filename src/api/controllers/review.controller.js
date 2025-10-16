@@ -7,6 +7,7 @@ import reviewService from '../../shared/services/review.service.js';
 import logger from '../../shared/observability/index.js';
 import { createOperationSpan } from '../../shared/observability/tracing/helpers.js';
 import ProductRating from '../../shared/models/productRating.model.js';
+import mongoose from 'mongoose';
 
 /**
  * Get error status code based on error type
@@ -400,7 +401,16 @@ export const getProductRating = async (req, res) => {
     const { productId } = req.params;
 
     // Fast lookup from product_ratings collection
-    let rating = await ProductRating.findOne({ productId }).lean();
+    // Convert string ID to ObjectId for MongoDB query
+    let objectId;
+    try {
+      objectId = new mongoose.Types.ObjectId(productId);
+    } catch (error) {
+      // If conversion fails, keep original string ID
+      objectId = productId;
+    }
+
+    let rating = await ProductRating.findOne({ productId: objectId }).lean();
 
     if (!rating) {
       // Fallback: calculate and store rating if not exists
@@ -435,10 +445,19 @@ export const getProductRatingsBatch = async (req, res) => {
     'products.count': req.body?.productIds?.length || 0,
   });
   const startTime = logger.operationStart('getProductRatingsBatch', req);
+
+  console.log('[ReviewController] === BATCH RATINGS REQUEST ===');
+  console.log('[ReviewController] Request method:', req.method);
+  console.log('[ReviewController] Request URL:', req.url);
+  console.log('[ReviewController] Request body:', JSON.stringify(req.body, null, 2));
+  console.log('[ReviewController] Request headers:', JSON.stringify(req.headers, null, 2));
+
   try {
     const { productIds } = req.body;
+    console.log('[ReviewController] Extracted productIds:', productIds);
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
+      console.log('[ReviewController] Invalid productIds - not array or empty');
       return res.status(400).json({
         success: false,
         message: 'productIds array is required',
@@ -446,6 +465,7 @@ export const getProductRatingsBatch = async (req, res) => {
     }
 
     if (productIds.length > 100) {
+      console.log('[ReviewController] Too many productIds:', productIds.length);
       return res.status(400).json({
         success: false,
         message: 'Maximum 100 products per batch request',
@@ -453,42 +473,80 @@ export const getProductRatingsBatch = async (req, res) => {
     }
 
     // Fast batch lookup from product_ratings collection
+    // Convert string IDs to ObjectIds for MongoDB query
+    console.log('[ReviewController] Converting productIds to ObjectIds...');
+    const objectIds = productIds.map((id) => {
+      try {
+        const objectId = new mongoose.Types.ObjectId(id);
+        console.log(`[ReviewController] Converted ${id} -> ${objectId}`);
+        return objectId;
+      } catch (error) {
+        console.log(`[ReviewController] Failed to convert ${id} to ObjectId:`, error.message);
+        // If conversion fails, keep original string ID
+        return id;
+      }
+    });
+    console.log('[ReviewController] Final objectIds for query:', objectIds);
+
+    console.log('[ReviewController] Querying ProductRating collection...');
     const ratings = await ProductRating.find({
-      productId: { $in: productIds },
+      productId: { $in: objectIds },
     }).lean();
+    console.log('[ReviewController] Found ratings from database:', JSON.stringify(ratings, null, 2));
 
     // Create a map for quick lookup
+    // Convert ObjectId productIds back to strings for mapping
+    console.log('[ReviewController] Creating rating map...');
     const ratingMap = ratings.reduce((acc, rating) => {
-      acc[rating.productId] = rating;
+      const productIdString = rating.productId.toString();
+      console.log(`[ReviewController] Mapping ${productIdString} ->`, {
+        averageRating: rating.averageRating,
+        totalReviews: rating.totalReviews,
+      });
+      acc[productIdString] = rating;
       return acc;
     }, {});
+    console.log('[ReviewController] Final ratingMap:', Object.keys(ratingMap));
 
     // Fill in missing ratings with defaults
+    console.log('[ReviewController] Building final result array...');
     const result = productIds.map((productId) => {
-      return (
-        ratingMap[productId] || {
-          productId,
-          averageRating: 0,
-          totalReviews: 0,
-          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-          verifiedPurchaseRating: null,
-          verifiedReviewsCount: 0,
-          lastUpdated: new Date(),
-        }
-      );
+      const foundRating = ratingMap[productId];
+      const finalRating = foundRating || {
+        productId,
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        verifiedPurchaseRating: null,
+        verifiedReviewsCount: 0,
+        lastUpdated: new Date(),
+      };
+      console.log(`[ReviewController] Final rating for ${productId}:`, {
+        averageRating: finalRating.averageRating,
+        totalReviews: finalRating.totalReviews,
+      });
+      return finalRating;
     });
+
+    console.log('[ReviewController] === FINAL RESULT ===');
+    console.log('[ReviewController] Returning result:', JSON.stringify(result, null, 2));
 
     span.setStatus(1);
     logger.operationComplete('getProductRatingsBatch', startTime, req, {
       requestedCount: productIds.length,
       foundCount: ratings.length,
     });
-    res.status(200).json({
+
+    const responseData = {
       success: true,
       message: 'Product ratings retrieved',
       data: result,
-    });
+    };
+    console.log('[ReviewController] Sending response:', JSON.stringify(responseData, null, 2));
+
+    res.status(200).json(responseData);
   } catch (error) {
+    console.error('[ReviewController] ERROR in getProductRatingsBatch:', error);
     span.setStatus(2, error.message);
     logger.operationFailed('getProductRatingsBatch', startTime, error, req);
     res.status(500).json({

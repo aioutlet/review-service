@@ -7,6 +7,7 @@ import messageBrokerService from './messageBroker.service.js';
 import axios from 'axios';
 import config from '../config/index.js';
 import { createOperationSpan } from '../observability/tracing/helpers.js';
+import mongoose from 'mongoose';
 
 class ReviewService {
   /**
@@ -660,9 +661,20 @@ class ReviewService {
     try {
       const log = logger.withCorrelationId(correlationId);
 
+      // Convert string productId to ObjectId for MongoDB query
+      let objectId;
+      try {
+        objectId = new mongoose.Types.ObjectId(productId);
+        console.log('Converting productId:', productId, 'to ObjectId:', objectId);
+      } catch (error) {
+        // If conversion fails, keep original string ID
+        objectId = productId;
+        console.log('Failed to convert productId:', productId, 'keeping as string');
+      }
+
       // Aggregate review data from reviews collection
       const pipeline = [
-        { $match: { productId, status: 'approved' } },
+        { $match: { productId: objectId, status: 'approved' } },
         {
           $group: {
             _id: '$productId',
@@ -802,6 +814,15 @@ class ReviewService {
    * @returns {Promise<Object>} Trends data
    */
   async calculateReviewTrends(productId) {
+    // Convert string productId to ObjectId for MongoDB query
+    let objectId;
+    try {
+      objectId = new mongoose.Types.ObjectId(productId);
+    } catch (error) {
+      // If conversion fails, keep original string ID
+      objectId = productId;
+    }
+
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -810,7 +831,7 @@ class ReviewService {
       Review.aggregate([
         {
           $match: {
-            productId,
+            productId: objectId,
             status: 'approved',
             createdAt: { $gte: last7Days },
           },
@@ -826,7 +847,7 @@ class ReviewService {
       Review.aggregate([
         {
           $match: {
-            productId,
+            productId: objectId,
             status: 'approved',
             createdAt: { $gte: last30Days },
           },

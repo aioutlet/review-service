@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const productRatingSchema = new mongoose.Schema(
   {
     productId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       unique: true,
       index: true,
@@ -170,4 +170,4 @@ productRatingSchema.pre('save', function (next) {
   next();
 });
 
-export default mongoose.model('ProductRating', productRatingSchema);
+export default mongoose.model('ProductRating', productRatingSchema, 'product_ratings');
