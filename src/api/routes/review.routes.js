@@ -12,8 +12,12 @@ import {
   deleteReview,
   voteOnReview,
   getUserReviews,
+  getProductRating,
+  getProductRatingsBatch,
+  bulkDeleteReviews,
+  getInternalStats,
 } from '../controllers/review.controller.js';
-import { authenticateUser, optionalAuth } from '../middlewares/auth.middleware.js';
+import { authenticateUser, optionalAuth, requireRole } from '../middlewares/auth.middleware.js';
 import { validateRequest } from '../middlewares/validation.middleware.js';
 
 const router = express.Router();
@@ -23,22 +27,22 @@ router.get('/product/:productId', optionalAuth, getProductReviews);
 router.get('/:reviewId', optionalAuth, getReviewById);
 
 // Protected routes (require authentication)
-router.post(
-  '/',
-  authenticateUser,
-  createReview
-);
+router.post('/', authenticateUser, createReview);
 
 router.put('/:reviewId', authenticateUser, updateReview);
 
 router.delete('/:reviewId', authenticateUser, deleteReview);
 
-router.post(
-  '/:reviewId/vote',
-  authenticateUser,
-  voteOnReview
-);
+router.post('/:reviewId/vote', authenticateUser, voteOnReview);
 
 router.get('/user/my-reviews', authenticateUser, getUserReviews);
+
+// Fast rating endpoints (for performance optimization)
+router.get('/products/:productId/rating', optionalAuth, getProductRating);
+router.post('/products/ratings/batch', optionalAuth, getProductRatingsBatch);
+
+// Admin routes (require admin role)
+router.post('/admin/bulk-delete', authenticateUser, requireRole(['admin']), bulkDeleteReviews);
+router.get('/admin/stats', authenticateUser, requireRole(['admin']), getInternalStats);
 
 export default router;

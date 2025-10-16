@@ -71,8 +71,20 @@ export const readiness = async (req, res) => {
       statusCode = 503;
     }
 
-    // TODO: Check RabbitMQ connection when messaging is implemented
-    // checks.messaging = rabbitmqService.isConnected();
+    // Check messaging connection
+    try {
+      const messageBrokerService = (await import('../../shared/services/messageBroker.service.js')).default;
+      const messagingHealth = messageBrokerService.getHealthStatus();
+      checks.messaging = messagingHealth.connected;
+      if (!checks.messaging) {
+        overallStatus = 'not_ready';
+        statusCode = 503;
+      }
+    } catch (error) {
+      checks.messaging = false;
+      overallStatus = 'not_ready';
+      statusCode = 503;
+    }
 
     const readinessStatus = {
       status: overallStatus,

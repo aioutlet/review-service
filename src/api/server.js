@@ -35,7 +35,13 @@ async function startAPI() {
     await connectRedis();
     logger.info('✅ Database connections established');
 
-    // Create Express app (includes publisher setup)
+    // Initialize messaging for API (publisher)
+    logger.info('Initializing messaging...');
+    const messageBrokerService = (await import('../shared/services/messageBroker.service.js')).default;
+    await messageBrokerService.initialize();
+    logger.info('✅ Messaging initialized');
+
+    // Create Express app
     const app = createApp();
 
     // Start HTTP server
@@ -110,6 +116,11 @@ async function gracefulShutdown(signal) {
 
     // Close database connections (handled by their respective modules)
     logger.info('Closing database connections...');
+
+    // Close messaging connections
+    logger.info('Closing messaging connections...');
+    const messageBrokerService = (await import('../shared/services/messageBroker.service.js')).default;
+    await messageBrokerService.close();
 
     clearTimeout(shutdownTimeout);
     logger.info('✅ Graceful shutdown completed successfully');

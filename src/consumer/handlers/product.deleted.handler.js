@@ -2,8 +2,6 @@ import logger from '../../shared/observability/index.js';
 import reviewService from '../../shared/services/review.service.js';
 import cacheService from '../../shared/services/cache.service.js';
 import Review from '../../shared/models/review.model.js';
-import ProductRating from '../../shared/models/productRating.model.js';
-import ReviewFlag from '../../shared/models/reviewFlag.model.js';
 
 /**
  * Handle product deleted event
@@ -26,32 +24,14 @@ export const handleProductDeleted = async (eventData, correlationId) => {
     }
 
     let deletedReviews = 0;
-    let deletedFlags = 0;
-    let deletedRating = false;
 
     if (deleteReviews) {
-      // Get all review IDs for this product
-      const reviewIds = await Review.find({ productId }).distinct('_id');
-
       // Delete all reviews for the product
       const deleteResult = await Review.deleteMany({ productId });
       deletedReviews = deleteResult.deletedCount;
 
-      // Delete all flags for reviews of this product
-      if (reviewIds.length > 0) {
-        const flagDeleteResult = await ReviewFlag.deleteMany({
-          reviewId: { $in: reviewIds },
-        });
-        deletedFlags = flagDeleteResult.deletedCount;
-      }
-
-      // Delete product rating aggregate
-      const ratingDeleteResult = await ProductRating.deleteOne({ productId });
-      deletedRating = ratingDeleteResult.deletedCount > 0;
-
       // Clear all caches related to this product
       await Promise.all([
-        cacheService.deleteProductRating(productId, correlationId),
         cacheService.deleteProductReviews(productId, correlationId),
         cacheService.deleteByPattern(`review-service:analytics:product:${productId}*`, correlationId),
       ]);
@@ -59,8 +39,6 @@ export const handleProductDeleted = async (eventData, correlationId) => {
       log.info('Product deleted event processed successfully', {
         productId,
         deletedReviews,
-        deletedFlags,
-        deletedRating,
       });
     } else {
       // Just mark reviews as inactive or hide them
@@ -75,10 +53,7 @@ export const handleProductDeleted = async (eventData, correlationId) => {
       );
 
       // Clear caches
-      await Promise.all([
-        cacheService.deleteProductRating(productId, correlationId),
-        cacheService.deleteProductReviews(productId, correlationId),
-      ]);
+      await cacheService.deleteProductReviews(productId, correlationId);
 
       log.info('Product reviews hidden successfully', {
         productId,

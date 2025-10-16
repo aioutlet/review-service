@@ -50,10 +50,7 @@ export const handleOrderCompleted = async (eventData, correlationId) => {
             modifiedCount: result.modifiedCount,
           });
 
-          // Update product rating to reflect verified purchase changes
-          await reviewService.updateProductRating(productId, correlationId);
-
-          // Clear cached reviews for this product
+          // Clear cached reviews for this product to reflect verified purchase changes
           await cacheService.deleteProductReviews(productId, correlationId);
         }
       } catch (error) {

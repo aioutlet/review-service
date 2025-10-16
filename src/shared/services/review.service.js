@@ -3,12 +3,7 @@ import ProductRating from '../models/productRating.model.js';
 import logger from '../observability/index.js';
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
 import cacheService from './cache.service.js';
-import {
-  publishReviewCreated,
-  publishReviewUpdated,
-  publishReviewDeleted,
-  publishRatingUpdated,
-} from '../messaging/publisher.js';
+import messageBrokerService from './messageBroker.service.js';
 import axios from 'axios';
 import config from '../config/index.js';
 import { createOperationSpan } from '../observability/tracing/helpers.js';
@@ -83,6 +78,11 @@ class ReviewService {
       // Update product rating aggregate asynchronously
       this.updateProductRating(reviewData.productId, correlationId).catch((err) => {
         log.error('Failed to update product rating:', err);
+      });
+
+      // Clear product cache to refresh aggregated data
+      cacheService.deleteProductReviews(reviewData.productId, correlationId).catch((err) => {
+        log.error('Failed to clear product cache:', err);
       });
 
       // Publish event
@@ -350,7 +350,8 @@ class ReviewService {
 
       // Update product rating if rating changed
       if (updateData.rating !== undefined) {
-        this.updateProductRating(review.productId, correlationId).catch((err) => {
+        // Clear product cache to refresh aggregated data
+        this.clearProductCache(review.productId, correlationId).catch((err) => {
           log.error('Failed to update product rating:', err);
         });
       }
@@ -404,7 +405,8 @@ class ReviewService {
       await Review.findByIdAndDelete(reviewId);
 
       // Update product rating
-      this.updateProductRating(productId, correlationId).catch((err) => {
+      // Clear product cache to refresh aggregated data
+      this.clearProductCache(productId, correlationId).catch((err) => {
         log.error('Failed to update product rating after deletion:', err);
       });
 
@@ -539,218 +541,16 @@ class ReviewService {
   }
 
   /**
-   * Update product rating aggregate
+   * Clear product cache to refresh aggregated data
    * @param {String} productId - Product ID
    * @param {String} correlationId - Request correlation ID
-   * @returns {Promise<Object>} Updated rating
    */
-  async updateProductRating(productId, correlationId) {
+  async clearProductCache(productId, correlationId) {
     try {
-      const log = logger.withCorrelationId(correlationId);
-
-      const pipeline = [
-        { $match: { productId, status: 'approved' } },
-        {
-          $group: {
-            _id: '$productId',
-            totalReviews: { $sum: 1 },
-            averageRating: { $avg: '$rating' },
-            ratingDistribution: { $push: '$rating' },
-            verifiedReviews: { $sum: { $cond: ['$isVerifiedPurchase', 1, 0] } },
-            verifiedRatingSum: { $sum: { $cond: ['$isVerifiedPurchase', '$rating', 0] } },
-            sentimentCounts: { $push: '$sentiment.label' },
-            totalHelpfulVotes: { $sum: '$helpfulVotes.helpful' },
-            reviewsWithMedia: {
-              $sum: {
-                $cond: [
-                  {
-                    $or: [
-                      { $gt: [{ $size: { $ifNull: ['$images', []] } }, 0] },
-                      { $gt: [{ $size: { $ifNull: ['$videos', []] } }, 0] },
-                    ],
-                  },
-                  1,
-                  0,
-                ],
-              },
-            },
-            averageReviewLength: { $avg: { $strLenCP: { $ifNull: ['$comment', ''] } } },
-            lastReviewDate: { $max: '$metadata.createdAt' },
-            firstReviewDate: { $min: '$metadata.createdAt' },
-          },
-        },
-      ];
-
-      const [result] = await Review.aggregate(pipeline);
-
-      if (result) {
-        // Calculate rating distribution
-        const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        result.ratingDistribution.forEach((rating) => {
-          distribution[rating]++;
-        });
-
-        // Calculate sentiment distribution
-        const sentiment = { positive: 0, neutral: 0, negative: 0 };
-        result.sentimentCounts.forEach((label) => {
-          if (label && sentiment[label] !== undefined) {
-            sentiment[label]++;
-          }
-        });
-
-        // Calculate verified purchase rating
-        const verifiedRating = result.verifiedReviews > 0 ? result.verifiedRatingSum / result.verifiedReviews : null;
-
-        // Calculate trends (last 7 and 30 days)
-        const trends = await this.calculateReviewTrends(productId);
-
-        const ratingData = {
-          productId,
-          averageRating: Math.round(result.averageRating * 10) / 10,
-          totalReviews: result.totalReviews,
-          ratingDistribution: distribution,
-          verifiedPurchaseRating: verifiedRating ? Math.round(verifiedRating * 10) / 10 : null,
-          verifiedReviewsCount: result.verifiedReviews,
-          sentiment,
-          qualityMetrics: {
-            averageHelpfulScore:
-              result.totalReviews > 0 ? Math.round((result.totalHelpfulVotes / result.totalReviews) * 100) / 100 : 0,
-            totalHelpfulVotes: result.totalHelpfulVotes,
-            reviewsWithMedia: result.reviewsWithMedia,
-            averageReviewLength: Math.round(result.averageReviewLength || 0),
-          },
-          trends,
-          lastReviewDate: result.lastReviewDate,
-          firstReviewDate: result.firstReviewDate,
-          lastUpdated: new Date(),
-        };
-
-        const updatedRating = await ProductRating.findOneAndUpdate({ productId }, ratingData, {
-          upsert: true,
-          new: true,
-        });
-
-        // Update cache
-        await cacheService.setProductRating(
-          productId,
-          {
-            averageRating: ratingData.averageRating,
-            totalReviews: ratingData.totalReviews,
-            ratingDistribution: distribution,
-            verifiedPurchaseRating: ratingData.verifiedPurchaseRating,
-          },
-          correlationId
-        );
-
-        // Publish rating updated event
-        await publishRatingUpdated(
-          {
-            productId,
-            averageRating: ratingData.averageRating,
-            totalReviews: ratingData.totalReviews,
-            ratingDistribution: distribution,
-          },
-          correlationId
-        );
-
-        log.info('Product rating updated', {
-          productId,
-          averageRating: ratingData.averageRating,
-          totalReviews: ratingData.totalReviews,
-        });
-
-        return updatedRating;
-      } else {
-        // No reviews found, set default rating
-        const defaultRating = {
-          productId,
-          averageRating: 0,
-          totalReviews: 0,
-          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-          verifiedPurchaseRating: null,
-          verifiedReviewsCount: 0,
-          sentiment: { positive: 0, neutral: 0, negative: 0 },
-          qualityMetrics: {
-            averageHelpfulScore: 0,
-            totalHelpfulVotes: 0,
-            reviewsWithMedia: 0,
-            averageReviewLength: 0,
-          },
-          trends: {
-            last30Days: { totalReviews: 0, averageRating: 0 },
-            last7Days: { totalReviews: 0, averageRating: 0 },
-          },
-          lastUpdated: new Date(),
-        };
-
-        await ProductRating.findOneAndUpdate({ productId }, defaultRating, { upsert: true, new: true });
-
-        // Clear cache
-        await cacheService.deleteProductRating(productId, correlationId);
-
-        return defaultRating;
-      }
+      await cacheService.deleteProductReviews(productId, correlationId);
     } catch (error) {
-      logger.error('Error updating product rating:', error);
-      throw error;
+      logger.error('Error clearing product cache:', error);
     }
-  }
-
-  /**
-   * Calculate review trends for last 7 and 30 days
-   * @param {String} productId - Product ID
-   * @returns {Promise<Object>} Trends data
-   */
-  async calculateReviewTrends(productId) {
-    const now = new Date();
-    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const [trends7, trends30] = await Promise.all([
-      Review.aggregate([
-        {
-          $match: {
-            productId,
-            status: 'approved',
-            'metadata.createdAt': { $gte: last7Days },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalReviews: { $sum: 1 },
-            averageRating: { $avg: '$rating' },
-          },
-        },
-      ]),
-      Review.aggregate([
-        {
-          $match: {
-            productId,
-            status: 'approved',
-            'metadata.createdAt': { $gte: last30Days },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalReviews: { $sum: 1 },
-            averageRating: { $avg: '$rating' },
-          },
-        },
-      ]),
-    ]);
-
-    return {
-      last7Days: {
-        totalReviews: trends7[0]?.totalReviews || 0,
-        averageRating: trends7[0]?.averageRating ? Math.round(trends7[0].averageRating * 10) / 10 : 0,
-      },
-      last30Days: {
-        totalReviews: trends30[0]?.totalReviews || 0,
-        averageRating: trends30[0]?.averageRating ? Math.round(trends30[0].averageRating * 10) / 10 : 0,
-      },
-    };
   }
 
   /**
@@ -839,6 +639,218 @@ class ReviewService {
       // Return false if order service is down or validation fails
       return false;
     }
+  }
+
+  /**
+   * Update product rating aggregate in product_ratings collection
+   * @param {String} productId - Product ID
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Updated rating data
+   */
+  async updateProductRating(productId, correlationId) {
+    const operationSpan = createOperationSpan('review.update_product_rating', {
+      'product.id': productId,
+    });
+
+    const startTime = logger.operationStart('updateProductRating', null, {
+      correlationId,
+      metadata: { productId },
+    });
+
+    try {
+      const log = logger.withCorrelationId(correlationId);
+
+      // Aggregate review data from reviews collection
+      const pipeline = [
+        { $match: { productId, status: 'approved' } },
+        {
+          $group: {
+            _id: '$productId',
+            totalReviews: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+            ratingDistribution: { $push: '$rating' },
+            verifiedReviews: { $sum: { $cond: ['$isVerifiedPurchase', 1, 0] } },
+            verifiedRatingSum: { $sum: { $cond: ['$isVerifiedPurchase', '$rating', 0] } },
+            totalHelpfulVotes: { $sum: '$helpfulCount' },
+            averageReviewLength: { $avg: { $strLenCP: { $ifNull: ['$comment', ''] } } },
+            lastReviewDate: { $max: '$createdAt' },
+            firstReviewDate: { $min: '$createdAt' },
+          },
+        },
+      ];
+
+      const [result] = await Review.aggregate(pipeline);
+
+      if (result) {
+        // Calculate rating distribution
+        const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        result.ratingDistribution.forEach((rating) => {
+          distribution[rating]++;
+        });
+
+        // Calculate verified purchase rating
+        const verifiedRating = result.verifiedReviews > 0 ? result.verifiedRatingSum / result.verifiedReviews : null;
+
+        // Calculate trends (last 7 and 30 days)
+        const trends = await this.calculateReviewTrends(productId);
+
+        const ratingData = {
+          productId,
+          averageRating: Math.round(result.averageRating * 10) / 10,
+          totalReviews: result.totalReviews,
+          ratingDistribution: distribution,
+          verifiedPurchaseRating: verifiedRating ? Math.round(verifiedRating * 10) / 10 : null,
+          verifiedReviewsCount: result.verifiedReviews,
+          qualityMetrics: {
+            averageHelpfulScore:
+              result.totalHelpfulVotes > 0 ? Math.round((result.totalHelpfulVotes / result.totalReviews) * 100) : 0,
+            totalHelpfulVotes: result.totalHelpfulVotes,
+            reviewsWithMedia: 0, // TODO: Implement media counting
+            averageReviewLength: Math.round(result.averageReviewLength || 0),
+          },
+          trends,
+          lastReviewDate: result.lastReviewDate,
+          firstReviewDate: result.firstReviewDate,
+        };
+
+        // Update or create product rating record
+        const updatedRating = await ProductRating.findOneAndUpdate({ productId }, ratingData, {
+          upsert: true,
+          new: true,
+          runValidators: true,
+        });
+
+        // Cache the updated rating
+        await cacheService.setProductRating(productId, ratingData, correlationId).catch((err) => {
+          log.error('Failed to cache product rating:', err);
+        });
+
+        // Publish rating updated event
+        await messageBrokerService.publishRatingUpdated(
+          {
+            productId,
+            averageRating: ratingData.averageRating,
+            totalReviews: ratingData.totalReviews,
+            ratingDistribution: distribution,
+          },
+          correlationId
+        );
+
+        log.info('Product rating updated', {
+          productId,
+          averageRating: ratingData.averageRating,
+          totalReviews: ratingData.totalReviews,
+        });
+
+        operationSpan.setStatus(1);
+        logger.operationComplete('updateProductRating', startTime, null, {
+          correlationId,
+          metadata: { productId, totalReviews: ratingData.totalReviews },
+        });
+
+        return updatedRating;
+      } else {
+        // No reviews found, set default rating
+        const defaultRating = {
+          productId,
+          averageRating: 0,
+          totalReviews: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          verifiedPurchaseRating: null,
+          verifiedReviewsCount: 0,
+          qualityMetrics: {
+            averageHelpfulScore: 0,
+            totalHelpfulVotes: 0,
+            reviewsWithMedia: 0,
+            averageReviewLength: 0,
+          },
+          trends: {
+            last30Days: { totalReviews: 0, averageRating: 0 },
+            last7Days: { totalReviews: 0, averageRating: 0 },
+          },
+        };
+
+        const updatedRating = await ProductRating.findOneAndUpdate({ productId }, defaultRating, {
+          upsert: true,
+          new: true,
+          runValidators: true,
+        });
+
+        operationSpan.setStatus(1);
+        logger.operationComplete('updateProductRating', startTime, null, {
+          correlationId,
+          metadata: { productId, totalReviews: 0 },
+        });
+
+        return updatedRating;
+      }
+    } catch (error) {
+      operationSpan.setStatus(2, error.message);
+      logger.operationFailed('updateProductRating', startTime, error, null, {
+        correlationId,
+        metadata: { productId },
+      });
+      throw error;
+    } finally {
+      operationSpan.end();
+    }
+  }
+
+  /**
+   * Calculate review trends for last 7 and 30 days
+   * @param {String} productId - Product ID
+   * @returns {Promise<Object>} Trends data
+   */
+  async calculateReviewTrends(productId) {
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [trends7, trends30] = await Promise.all([
+      Review.aggregate([
+        {
+          $match: {
+            productId,
+            status: 'approved',
+            createdAt: { $gte: last7Days },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+          },
+        },
+      ]),
+      Review.aggregate([
+        {
+          $match: {
+            productId,
+            status: 'approved',
+            createdAt: { $gte: last30Days },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+          },
+        },
+      ]),
+    ]);
+
+    return {
+      last7Days: {
+        totalReviews: trends7[0]?.totalReviews || 0,
+        averageRating: trends7[0]?.averageRating ? Math.round(trends7[0].averageRating * 10) / 10 : 0,
+      },
+      last30Days: {
+        totalReviews: trends30[0]?.totalReviews || 0,
+        averageRating: trends30[0]?.averageRating ? Math.round(trends30[0].averageRating * 10) / 10 : 0,
+      },
+    };
   }
 }
 

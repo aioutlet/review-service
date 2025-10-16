@@ -17,9 +17,6 @@ import { tracingMiddleware, tracingErrorMiddleware, performanceMiddleware } from
 
 // Import routes
 import reviewRoutes from './routes/review.routes.js';
-import moderationRoutes from './routes/moderation.routes.js';
-import analyticsRoutes from './routes/analytics.routes.js';
-import internalRoutes from './routes/internal.routes.js';
 
 // Import operational controllers
 import { health, readiness, liveness, metrics } from './controllers/operational.controller.js';
@@ -165,9 +162,6 @@ export default function createApp() {
 
   // API Routes
   app.use('/api/v1/reviews', reviewRoutes);
-  app.use('/api/v1/moderation', moderationRoutes);
-  app.use('/api/v1/analytics', analyticsRoutes);
-  app.use('/api/v1/internal', internalRoutes);
 
   // Operational endpoints (health checks, metrics)
   app.get('/health', health);
@@ -184,9 +178,8 @@ export default function createApp() {
       documentation: 'https://docs.aioutlet.com/api/review-service',
       endpoints: {
         reviews: '/api/v1/reviews',
-        moderation: '/api/v1/moderation',
-        analytics: '/api/v1/analytics',
-        internal: '/api/v1/internal',
+        ratings: '/api/v1/reviews/products',
+        admin: '/api/v1/reviews/admin',
         health: '/health',
         metrics: '/metrics',
       },

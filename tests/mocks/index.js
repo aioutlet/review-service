@@ -13,14 +13,11 @@ export const mockReview = {
   constructor: jest.fn(),
 };
 
-export const mockProductRating = {
-  findOneAndUpdate: jest.fn(),
-};
-
 // Mock cache service
 export const mockCacheService = {
-  setProductRating: jest.fn(),
-  deleteProductRating: jest.fn(),
+  deleteProductReviews: jest.fn(),
+  deleteUserReviews: jest.fn(),
+  deleteByPattern: jest.fn(),
 };
 
 // Mock messaging publisher
@@ -28,7 +25,6 @@ export const mockPublisher = {
   publishReviewCreated: jest.fn(),
   publishReviewUpdated: jest.fn(),
   publishReviewDeleted: jest.fn(),
-  publishRatingUpdated: jest.fn(),
 };
 
 // Mock logger
@@ -74,14 +70,13 @@ export const mockCreateOperationSpan = jest.fn().mockReturnValue({
 
 // Reset all mocks
 export const resetAllMocks = () => {
-  Object.values(mockReview).forEach(mock => typeof mock === 'function' && mock.mockReset());
-  Object.values(mockProductRating).forEach(mock => typeof mock === 'function' && mock.mockReset());
-  Object.values(mockCacheService).forEach(mock => typeof mock === 'function' && mock.mockReset());
-  Object.values(mockPublisher).forEach(mock => typeof mock === 'function' && mock.mockReset());
-  Object.values(mockLogger).forEach(mock => typeof mock === 'function' && mock.mockReset());
-  Object.values(mockAxios).forEach(mock => typeof mock === 'function' && mock.mockReset());
+  Object.values(mockReview).forEach((mock) => typeof mock === 'function' && mock.mockReset());
+  Object.values(mockCacheService).forEach((mock) => typeof mock === 'function' && mock.mockReset());
+  Object.values(mockPublisher).forEach((mock) => typeof mock === 'function' && mock.mockReset());
+  Object.values(mockLogger).forEach((mock) => typeof mock === 'function' && mock.mockReset());
+  Object.values(mockAxios).forEach((mock) => typeof mock === 'function' && mock.mockReset());
   mockCreateOperationSpan.mockClear();
-  
+
   // Reset logger chain
   mockLogger.withCorrelationId.mockReturnValue({
     info: jest.fn(),

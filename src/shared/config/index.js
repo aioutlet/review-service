@@ -67,7 +67,6 @@ const config = {
   },
   cache: {
     ttl: parseInt(process.env.CACHE_TTL) || 3600, // 1 hour
-    productRatingTtl: 300, // 5 minutes
   },
   upload: {
     maxFileSize: process.env.MAX_FILE_SIZE || '10MB',

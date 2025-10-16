@@ -5,7 +5,6 @@ import config from '../config/index.js';
 class CacheService {
   constructor() {
     this.defaultTtl = config.cache.ttl;
-    this.productRatingTtl = config.cache.productRatingTtl;
   }
 
   /**
@@ -191,40 +190,6 @@ class CacheService {
   }
 
   // Product Rating Cache Methods
-
-  /**
-   * Cache product rating data
-   * @param {String} productId - Product ID
-   * @param {Object} ratingData - Rating data
-   * @param {String} correlationId - Request correlation ID
-   * @returns {Promise<Boolean>} Success status
-   */
-  async setProductRating(productId, ratingData, correlationId) {
-    const key = this.generateKey('product-rating', productId);
-    return this.set(key, ratingData, this.productRatingTtl, correlationId);
-  }
-
-  /**
-   * Get cached product rating
-   * @param {String} productId - Product ID
-   * @param {String} correlationId - Request correlation ID
-   * @returns {Promise<Object|null>} Cached rating data
-   */
-  async getProductRating(productId, correlationId) {
-    const key = this.generateKey('product-rating', productId);
-    return this.get(key, correlationId);
-  }
-
-  /**
-   * Delete cached product rating
-   * @param {String} productId - Product ID
-   * @param {String} correlationId - Request correlation ID
-   * @returns {Promise<Boolean>} Success status
-   */
-  async deleteProductRating(productId, correlationId) {
-    const key = this.generateKey('product-rating', productId);
-    return this.delete(key, correlationId);
-  }
 
   // Review List Cache Methods
 

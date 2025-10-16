@@ -2,7 +2,6 @@ import logger from '../../shared/observability/index.js';
 import reviewService from '../../shared/services/review.service.js';
 import cacheService from '../../shared/services/cache.service.js';
 import Review from '../../shared/models/review.model.js';
-import ReviewFlag from '../../shared/models/reviewFlag.model.js';
 
 /**
  * Handle user deleted event
@@ -25,7 +24,6 @@ export const handleUserDeleted = async (eventData, correlationId) => {
     }
 
     let deletedReviews = 0;
-    let deletedFlags = 0;
     let anonymizedReviews = 0;
 
     if (deleteData) {
@@ -36,17 +34,12 @@ export const handleUserDeleted = async (eventData, correlationId) => {
       const deleteResult = await Review.deleteMany({ userId });
       deletedReviews = deleteResult.deletedCount;
 
-      // Delete review flags created by the user
-      const flagDeleteResult = await ReviewFlag.deleteMany({ flaggedBy: userId });
-      deletedFlags = flagDeleteResult.deletedCount;
-
-      // Update product ratings for affected products
+      // Clear caches for affected products
       for (const productId of productIds) {
         try {
-          await reviewService.updateProductRating(productId, correlationId);
           await cacheService.deleteProductReviews(productId, correlationId);
         } catch (error) {
-          log.error('Error updating product rating after user deletion:', {
+          log.error('Error clearing product cache after user deletion:', {
             error: error.message,
             productId,
           });
@@ -71,20 +64,6 @@ export const handleUserDeleted = async (eventData, correlationId) => {
       );
       anonymizedReviews = anonymizeResult.modifiedCount;
 
-      // Anonymize flags
-      await ReviewFlag.updateMany(
-        { flaggedBy: userId },
-        {
-          $set: {
-            flaggedByName: 'Anonymous User',
-            'metadata.updatedAt': new Date(),
-          },
-          $unset: {
-            flaggedBy: 1,
-          },
-        }
-      );
-
       // Clear user cache
       await cacheService.deleteUserReviews(userId, correlationId);
     }
@@ -93,7 +72,6 @@ export const handleUserDeleted = async (eventData, correlationId) => {
       userId,
       deleteData,
       deletedReviews,
-      deletedFlags,
       anonymizedReviews,
     });
   } catch (error) {

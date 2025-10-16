@@ -6,7 +6,6 @@
 import amqp from 'amqplib';
 import config from '../../config/index.js';
 import logger from '../../observability/index.js';
-import * as consumer from '../consumer.js';
 import IMessageBroker from '../IMessageBroker.js';
 
 class RabbitMQBroker extends IMessageBroker {
@@ -227,18 +226,30 @@ class RabbitMQBroker extends IMessageBroker {
       // Set prefetch count to control message processing
       await this.channel.prefetch(10);
 
-      // Start consumers
-      await Promise.all([
-        this.startConsumer(queues.orderCompleted, consumer.handleOrderCompleted),
-        this.startConsumer(queues.userDeleted, consumer.handleUserDeleted),
-        this.startConsumer(queues.productDeleted, consumer.handleProductDeleted),
-      ]);
+      // Start consumers for registered queues
+      const queueNames = [queues.orderCompleted, queues.userDeleted, queues.productDeleted];
+
+      await Promise.all(queueNames.map((queue) => this.startConsumer(queue, this.getDefaultHandler())));
 
       logger.info('RabbitMQ consumers started successfully');
     } catch (error) {
       logger.error('Failed to start consuming messages:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get default message handler (uses registered event handlers)
+   * @returns {Function} Default handler function
+   */
+  getDefaultHandler() {
+    return async (content, correlationId) => {
+      // This will be handled by the specific event handlers registered via registerEventHandler
+      logger.debug('Processing message with default handler', {
+        eventType: content.eventType,
+        correlationId,
+      });
+    };
   }
 
   /**

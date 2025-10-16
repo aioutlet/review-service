@@ -6,6 +6,7 @@
 import reviewService from '../../shared/services/review.service.js';
 import logger from '../../shared/observability/index.js';
 import { createOperationSpan } from '../../shared/observability/tracing/helpers.js';
+import ProductRating from '../../shared/models/productRating.model.js';
 
 /**
  * Get error status code based on error type
@@ -382,6 +383,164 @@ export const getUserReviews = async (req, res) => {
       message: error.message,
       code: error.code || 'USER_REVIEWS_ERROR',
     });
+  } finally {
+    span.end();
+  }
+};
+
+/**
+ * Get product rating aggregate (fast path using product_ratings collection)
+ */
+export const getProductRating = async (req, res) => {
+  const span = createOperationSpan('controller.review.product_rating', {
+    'product.id': req.params.productId,
+  });
+  const startTime = logger.operationStart('getProductRating', req);
+  try {
+    const { productId } = req.params;
+
+    // Fast lookup from product_ratings collection
+    let rating = await ProductRating.findOne({ productId }).lean();
+
+    if (!rating) {
+      // Fallback: calculate and store rating if not exists
+      rating = await reviewService.updateProductRating(productId, req.correlationId);
+    }
+
+    span.setStatus(1);
+    logger.operationComplete('getProductRating', startTime, req, { productId });
+    res.status(200).json({
+      success: true,
+      message: 'Product rating retrieved',
+      data: rating,
+    });
+  } catch (error) {
+    span.setStatus(2, error.message);
+    logger.operationFailed('getProductRating', startTime, error, req);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      code: error.code || 'PRODUCT_RATING_ERROR',
+    });
+  } finally {
+    span.end();
+  }
+};
+
+/**
+ * Get product ratings for multiple products (batch operation)
+ */
+export const getProductRatingsBatch = async (req, res) => {
+  const span = createOperationSpan('controller.review.product_ratings_batch', {
+    'products.count': req.body?.productIds?.length || 0,
+  });
+  const startTime = logger.operationStart('getProductRatingsBatch', req);
+  try {
+    const { productIds } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required',
+      });
+    }
+
+    if (productIds.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum 100 products per batch request',
+      });
+    }
+
+    // Fast batch lookup from product_ratings collection
+    const ratings = await ProductRating.find({
+      productId: { $in: productIds },
+    }).lean();
+
+    // Create a map for quick lookup
+    const ratingMap = ratings.reduce((acc, rating) => {
+      acc[rating.productId] = rating;
+      return acc;
+    }, {});
+
+    // Fill in missing ratings with defaults
+    const result = productIds.map((productId) => {
+      return (
+        ratingMap[productId] || {
+          productId,
+          averageRating: 0,
+          totalReviews: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          verifiedPurchaseRating: null,
+          verifiedReviewsCount: 0,
+          lastUpdated: new Date(),
+        }
+      );
+    });
+
+    span.setStatus(1);
+    logger.operationComplete('getProductRatingsBatch', startTime, req, {
+      requestedCount: productIds.length,
+      foundCount: ratings.length,
+    });
+    res.status(200).json({
+      success: true,
+      message: 'Product ratings retrieved',
+      data: result,
+    });
+  } catch (error) {
+    span.setStatus(2, error.message);
+    logger.operationFailed('getProductRatingsBatch', startTime, error, req);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      code: error.code || 'BATCH_RATING_ERROR',
+    });
+  } finally {
+    span.end();
+  }
+};
+
+/**
+ * Bulk delete reviews (admin only)
+ */
+export const bulkDeleteReviews = async (req, res) => {
+  const span = createOperationSpan('controller.review.bulk_delete', {
+    'admin.id': req.user?.id,
+  });
+  const startTime = logger.operationStart('bulkDeleteReviews', req);
+  try {
+    const { reviewIds } = req.body;
+    const result = await reviewService.bulkDeleteReviews(reviewIds, req.user, req.correlationId);
+    span.setStatus(1);
+    logger.operationComplete('bulkDeleteReviews', startTime, req, { count: result.deletedCount });
+    res.status(200).json({ success: true, message: 'Bulk delete successful', data: result });
+  } catch (error) {
+    span.setStatus(2, error.message);
+    logger.operationFailed('bulkDeleteReviews', startTime, error, req);
+    res.status(500).json({ success: false, message: error.message, code: error.code || 'BULK_DELETE_ERROR' });
+  } finally {
+    span.end();
+  }
+};
+
+/**
+ * Get internal review stats (admin only)
+ */
+export const getInternalStats = async (req, res) => {
+  const span = createOperationSpan('controller.review.internal_stats', {
+    'admin.id': req.user?.id,
+  });
+  const startTime = logger.operationStart('getInternalStats', req);
+  try {
+    const stats = await reviewService.getInternalStats(req.correlationId);
+    span.setStatus(1);
+    logger.operationComplete('getInternalStats', startTime, req);
+    res.status(200).json({ success: true, message: 'Internal stats retrieved', data: stats });
+  } catch (error) {
+    span.setStatus(2, error.message);
+    logger.operationFailed('getInternalStats', startTime, error, req);
+    res.status(500).json({ success: false, message: error.message, code: error.code || 'STATS_ERROR' });
   } finally {
     span.end();
   }
