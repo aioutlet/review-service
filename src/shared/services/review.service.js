@@ -173,7 +173,7 @@ class ReviewService {
       const {
         page = 1,
         limit = 20,
-        sortBy = 'metadata.createdAt',
+        sortBy = 'createdAt',
         sortOrder = 'desc',
         status = 'approved',
         rating,
@@ -184,7 +184,14 @@ class ReviewService {
       } = options;
 
       // Build filter
-      const filter = { productId };
+      const filter = { productId: new mongoose.Types.ObjectId(productId) };
+
+      // Debug logging
+      console.log('[DEBUG] getProductReviews - productId:', productId);
+      console.log('[DEBUG] getProductReviews - filter:', filter);
+      console.log('[DEBUG] getProductReviews - status:', status);
+      console.log('[DEBUG] getProductReviews - filter:', filter);
+      console.log('[DEBUG] getProductReviews - options:', options);
 
       // Status filter
       if (Array.isArray(status)) {
@@ -192,6 +199,8 @@ class ReviewService {
       } else {
         filter.status = status;
       }
+
+      console.log('[DEBUG] getProductReviews - after status filter:', filter);
 
       // Rating filter
       if (rating) {
@@ -231,12 +240,15 @@ class ReviewService {
         sort['helpfulVotes.helpful'] = sortOrder === 'desc' ? -1 : 1;
       } else if (sortBy === 'rating') {
         sort.rating = sortOrder === 'desc' ? -1 : 1;
-        sort['metadata.createdAt'] = -1; // Secondary sort
+        sort['createdAt'] = -1; // Secondary sort
       } else {
         sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
       }
 
       const skip = (page - 1) * limit;
+
+      console.log('[DEBUG] getProductReviews - final filter before query:', JSON.stringify(filter, null, 2));
+      console.log('[DEBUG] getProductReviews - sort:', sort);
 
       // Execute queries in parallel
       const [reviews, total] = await Promise.all([
@@ -244,12 +256,15 @@ class ReviewService {
         Review.countDocuments(filter),
       ]);
 
+      console.log('[DEBUG] getProductReviews - query results - reviews found:', reviews.length);
+      console.log('[DEBUG] getProductReviews - query results - total count:', total);
+
       // Add virtual fields manually for lean queries
       const enrichedReviews = reviews.map((review) => ({
         ...review,
         helpfulScore: this.calculateHelpfulScore(review.helpfulVotes),
         totalVotes: review.helpfulVotes.helpful + review.helpfulVotes.notHelpful,
-        ageInDays: Math.floor((Date.now() - review.metadata.createdAt) / (1000 * 60 * 60 * 24)),
+        ageInDays: Math.floor((Date.now() - new Date(review.createdAt)) / (1000 * 60 * 60 * 24)),
       }));
 
       const result = {

@@ -58,6 +58,7 @@ export function createOperationSpan(operationName, attributes = {}) {
       end: () => {},
       setStatus: () => {},
       addEvent: () => {},
+      setAttributes: () => {},
     };
   }
 
@@ -80,6 +81,7 @@ export function createOperationSpan(operationName, attributes = {}) {
       end: () => span.end(),
       setStatus: (code, message) => span.setStatus({ code, message }),
       addEvent: (name, attributes) => span.addEvent(name, attributes),
+      setAttributes: (attrs) => span.setAttributes(attrs),
     };
   } catch (error) {
     // Return a no-op span if tracing fails
@@ -91,6 +93,7 @@ export function createOperationSpan(operationName, attributes = {}) {
       end: () => {},
       setStatus: () => {},
       addEvent: () => {},
+      setAttributes: () => {},
     };
   }
 }

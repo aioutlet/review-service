@@ -4,12 +4,12 @@ const reviewSchema = new mongoose.Schema(
   {
     // Core review data
     productId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       index: true,
     },
     userId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       index: true,
     },
