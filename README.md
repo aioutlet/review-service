@@ -62,7 +62,17 @@ PORT=9001
 HOST=0.0.0.0
 
 # Database
-MONGODB_URI=mongodb://localhost:27017/aioutlet_reviews
+# Option 1: Direct MongoDB URI (recommended)
+MONGODB_URI=mongodb://admin:admin123@localhost:27020/aioutlet_reviews?authSource=admin
+
+# Option 2: Individual variables (fallback if MONGODB_URI not set)
+# MONGO_INITDB_ROOT_USERNAME=admin
+# MONGO_INITDB_ROOT_PASSWORD=admin123
+# MONGO_INITDB_DATABASE=aioutlet_reviews
+# MONGODB_HOST=localhost
+# MONGODB_PORT=27020
+# MONGODB_AUTH_SOURCE=admin
+
 REDIS_URL=redis://localhost:6379
 
 # Message Broker

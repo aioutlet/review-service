@@ -9,7 +9,21 @@ const config = {
     host: process.env.HOST || '0.0.0.0',
   },
   database: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/aioutlet_reviews',
+    // Construct MongoDB URI from environment variables
+    uri: (() => {
+      const mongoHost = process.env.MONGODB_HOST || 'localhost';
+      const mongoPort = process.env.MONGODB_PORT || '27017';
+      const mongoUsername = process.env.MONGO_INITDB_ROOT_USERNAME;
+      const mongoPassword = process.env.MONGO_INITDB_ROOT_PASSWORD;
+      const mongoDatabase = process.env.MONGO_INITDB_DATABASE || 'aioutlet_reviews';
+      const mongoAuthSource = process.env.MONGODB_AUTH_SOURCE || 'admin';
+
+      if (mongoUsername && mongoPassword) {
+        return `mongodb://${mongoUsername}:${mongoPassword}@${mongoHost}:${mongoPort}/${mongoDatabase}?authSource=${mongoAuthSource}`;
+      } else {
+        return `mongodb://${mongoHost}:${mongoPort}/${mongoDatabase}`;
+      }
+    })(),
     options: {
       useNewUrlParser: true,
       useUnifiedTopology: true,
