@@ -1,7 +1,5 @@
 import logger from '../../shared/observability/index.js';
 import reviewService from '../../shared/services/review.service.js';
-import cacheService from '../../shared/services/cache.service.js';
-import Review from '../../shared/models/review.model.js';
 
 /**
  * Handle product deleted event
@@ -16,50 +14,22 @@ export const handleProductDeleted = async (eventData, correlationId) => {
       productId: eventData.productId,
     });
 
-    const { productId, deleteReviews = true } = eventData;
+    const { productId, hardDelete = false } = eventData;
 
     if (!productId) {
       log.warn('Invalid product deleted message format', { eventData });
       return;
     }
 
-    let deletedReviews = 0;
+    // Delegate to service layer for business logic
+    // By default, soft delete (isActive=false) unless hardDelete is explicitly true
+    const result = await reviewService.handleProductDeletion(productId, hardDelete, correlationId);
 
-    if (deleteReviews) {
-      // Delete all reviews for the product
-      const deleteResult = await Review.deleteMany({ productId });
-      deletedReviews = deleteResult.deletedCount;
-
-      // Clear all caches related to this product
-      await Promise.all([
-        cacheService.deleteProductReviews(productId, correlationId),
-        cacheService.deleteByPattern(`review-service:analytics:product:${productId}*`, correlationId),
-      ]);
-
-      log.info('Product deleted event processed successfully', {
-        productId,
-        deletedReviews,
-      });
-    } else {
-      // Just mark reviews as inactive or hide them
-      const updateResult = await Review.updateMany(
-        { productId },
-        {
-          $set: {
-            status: 'hidden',
-            'metadata.updatedAt': new Date(),
-          },
-        }
-      );
-
-      // Clear caches
-      await cacheService.deleteProductReviews(productId, correlationId);
-
-      log.info('Product reviews hidden successfully', {
-        productId,
-        hiddenReviews: updateResult.modifiedCount,
-      });
-    }
+    log.info('Product deleted event processed successfully', {
+      productId,
+      action: result.action,
+      affectedReviews: result.count,
+    });
   } catch (error) {
     logger.error('Error handling product deleted event:', {
       error: error.message,

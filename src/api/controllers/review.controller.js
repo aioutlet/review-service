@@ -39,10 +39,9 @@ export const createReview = async (req, res) => {
   try {
     const reviewData = {
       ...req.body,
-      userId: req.user.userId,
     };
 
-    const review = await reviewService.createReview(reviewData, req.correlationId);
+    const review = await reviewService.createReview(reviewData, req.user, req.correlationId);
 
     span.setAttributes({
       'review.id': review._id.toString(),

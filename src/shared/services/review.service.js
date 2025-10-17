@@ -68,6 +68,8 @@ class ReviewService {
         username: user.username,
         isVerifiedPurchase,
         status,
+        createdBy: user.userId,
+        updatedBy: user.userId,
         metadata: {
           ...reviewData.metadata,
           source: reviewData.source || 'web',
@@ -87,7 +89,7 @@ class ReviewService {
       });
 
       // Publish event
-      await publishReviewCreated(
+      await messageBrokerService.publishReviewCreated(
         {
           reviewId: savedReview._id,
           productId: savedReview.productId,
@@ -600,7 +602,7 @@ class ReviewService {
   async validateProduct(productId, correlationId) {
     try {
       const response = await axios.get(
-        `${config.externalServices.productService}/api/v1/internal/products/${productId}/exists`,
+        `${config.externalServices.productService}/api/products/internal/${productId}/exists`,
         {
           headers: {
             'X-Correlation-ID': correlationId,
@@ -887,6 +889,157 @@ class ReviewService {
         averageRating: trends30[0]?.averageRating ? Math.round(trends30[0].averageRating * 10) / 10 : 0,
       },
     };
+  }
+
+  /**
+   * Get internal statistics for admin dashboard
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Statistics including total, pending, average rating, and growth
+   */
+  async getInternalStats(correlationId) {
+    const log = logger.withCorrelationId(correlationId);
+
+    try {
+      log.info('Fetching review statistics for admin dashboard');
+
+      // Get current stats
+      const [totalReviews, pendingReviews, approvedReviews] = await Promise.all([
+        Review.countDocuments({}),
+        Review.countDocuments({ status: 'pending' }),
+        Review.countDocuments({ status: 'approved' }),
+      ]);
+
+      // Get average rating from approved reviews
+      const avgRatingResult = await Review.aggregate([
+        { $match: { status: 'approved' } },
+        {
+          $group: {
+            _id: null,
+            averageRating: { $avg: '$rating' },
+          },
+        },
+      ]);
+
+      const averageRating = avgRatingResult[0]?.averageRating
+        ? Math.round(avgRatingResult[0].averageRating * 10) / 10
+        : 0;
+
+      // Calculate growth (reviews from last 30 days vs previous 30 days)
+      const now = new Date();
+      const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const last60Days = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+      const [recentReviews, previousReviews] = await Promise.all([
+        Review.countDocuments({
+          createdAt: { $gte: last30Days, $lt: now },
+        }),
+        Review.countDocuments({
+          createdAt: { $gte: last60Days, $lt: last30Days },
+        }),
+      ]);
+
+      // Calculate growth percentage
+      let growth = 0;
+      if (previousReviews > 0) {
+        growth = Math.round(((recentReviews - previousReviews) / previousReviews) * 100 * 10) / 10;
+      } else if (recentReviews > 0) {
+        growth = 100; // 100% growth if no previous reviews
+      }
+
+      const stats = {
+        total: totalReviews,
+        pending: pendingReviews,
+        averageRating: averageRating,
+        growth: growth,
+      };
+
+      log.info('Review statistics fetched successfully', {
+        businessEvent: 'ADMIN_STATS_FETCHED',
+        stats,
+      });
+
+      return stats;
+    } catch (error) {
+      log.error('Failed to fetch review statistics', {
+        businessEvent: 'ADMIN_STATS_ERROR',
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Handle product deletion - delete or hide all reviews for a product
+   * @param {String} productId - Product ID
+   * @param {Boolean} deleteReviews - Whether to delete (true) or hide (false) reviews
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Result with count of affected reviews
+   */
+  async handleProductDeletion(productId, deleteReviews = true, correlationId) {
+    const log = logger.withCorrelationId(correlationId);
+
+    try {
+      log.info('Handling product deletion for reviews', {
+        productId,
+        deleteReviews,
+      });
+
+      let result;
+
+      if (deleteReviews) {
+        // Permanently delete all reviews for the product
+        const deleteResult = await Review.deleteMany({ productId });
+
+        // Clear all related caches
+        await Promise.all([
+          cacheService.deleteProductReviews(productId, correlationId),
+          cacheService.deleteByPattern(`review-service:analytics:product:${productId}*`, correlationId),
+        ]);
+
+        result = {
+          action: 'deleted',
+          count: deleteResult.deletedCount,
+        };
+
+        log.info('Reviews deleted for product', {
+          productId,
+          deletedCount: deleteResult.deletedCount,
+        });
+      } else {
+        // Soft delete: Mark reviews as hidden
+        const updateResult = await Review.updateMany(
+          { productId },
+          {
+            $set: {
+              status: 'hidden',
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        // Clear product review caches
+        await cacheService.deleteProductReviews(productId, correlationId);
+
+        result = {
+          action: 'soft_deleted',
+          count: updateResult.modifiedCount,
+        };
+
+        log.info('Reviews soft deleted for product', {
+          productId,
+          softDeletedCount: updateResult.modifiedCount,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      log.error('Error handling product deletion', {
+        productId,
+        deleteReviews,
+        error: error.message,
+      });
+      throw error;
+    }
   }
 }
 

@@ -31,11 +31,11 @@ export const verifyToken = (req, res, next) => {
 
     // Add user information to request
     req.user = {
-      userId: decoded.userId || decoded.sub,
-      username: decoded.username,
+      userId: decoded.userId || decoded.id || decoded.sub,
+      username: decoded.username || decoded.email?.split('@')[0],
       email: decoded.email,
       roles: decoded.roles || [],
-      isAdmin: decoded.isAdmin || false,
+      isAdmin: (decoded.roles || []).includes('admin') || decoded.isAdmin || false,
       isVerified: decoded.isVerified || false,
       iat: decoded.iat,
       exp: decoded.exp,

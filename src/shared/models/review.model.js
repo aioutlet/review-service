@@ -49,7 +49,7 @@ const reviewSchema = new mongoose.Schema(
     // Review status
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'approved', 'rejected', 'hidden'],
       default: 'pending',
       index: true,
     },
