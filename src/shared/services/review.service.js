@@ -949,6 +949,7 @@ class ReviewService {
       const stats = {
         total: totalReviews,
         pending: pendingReviews,
+        approved: approvedReviews,
         averageRating: averageRating,
         growth: growth,
       };
@@ -962,6 +963,77 @@ class ReviewService {
     } catch (error) {
       log.error('Failed to fetch review statistics', {
         businessEvent: 'ADMIN_STATS_ERROR',
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all reviews for admin dashboard with filtering and pagination
+   * @param {Object} options - Query options
+   * @param {String} correlationId - Request correlation ID
+   * @returns {Promise<Object>} Reviews with pagination info
+   */
+  async getAllReviewsForAdmin(options, correlationId) {
+    const log = logger.withCorrelationId(correlationId);
+
+    try {
+      const { status, rating, search, page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = options;
+
+      log.info('Fetching all reviews for admin', { options });
+
+      // Build query filter
+      const filter = {};
+
+      if (status) {
+        filter.status = status;
+      }
+
+      if (rating) {
+        filter.rating = parseInt(rating);
+      }
+
+      if (search) {
+        filter.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { comment: { $regex: search, $options: 'i' } },
+          { username: { $regex: search, $options: 'i' } },
+        ];
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+      const sort = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      // Execute query
+      const [reviews, total] = await Promise.all([
+        Review.find(filter).sort(sort).skip(skip).limit(limit).select('-__v -helpfulVotes.userVotes').lean(),
+        Review.countDocuments(filter),
+      ]);
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+
+      log.info('Reviews fetched successfully for admin', {
+        businessEvent: 'ADMIN_REVIEWS_FETCHED',
+        count: reviews.length,
+        total,
+      });
+
+      return {
+        data: reviews,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      };
+    } catch (error) {
+      log.error('Failed to fetch reviews for admin', {
+        businessEvent: 'ADMIN_REVIEWS_ERROR',
         error: error.message,
       });
       throw error;

@@ -602,3 +602,49 @@ export const getInternalStats = async (req, res) => {
     span.end();
   }
 };
+
+/**
+ * Get all reviews (admin only) - for moderation dashboard
+ */
+export const getAllReviews = async (req, res) => {
+  const span = createOperationSpan('controller.review.get_all', {
+    'admin.id': req.user?.userId,
+  });
+  const startTime = logger.operationStart('getAllReviews', req);
+
+  try {
+    const { status, rating, search, page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    const reviews = await reviewService.getAllReviewsForAdmin(
+      {
+        status,
+        rating: rating ? parseInt(rating) : undefined,
+        search,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        sortBy,
+        sortOrder,
+      },
+      req.correlationId
+    );
+
+    span.setStatus(1);
+    logger.operationComplete('getAllReviews', startTime, req, { count: reviews.data.length });
+
+    res.status(200).json({
+      success: true,
+      data: reviews.data,
+      pagination: reviews.pagination,
+    });
+  } catch (error) {
+    span.setStatus(2, error.message);
+    logger.operationFailed('getAllReviews', startTime, error, req);
+    res.status(getErrorStatusCode(error)).json({
+      success: false,
+      message: error.message,
+      code: error.code || 'GET_ALL_REVIEWS_ERROR',
+    });
+  } finally {
+    span.end();
+  }
+};

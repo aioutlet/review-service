@@ -54,11 +54,35 @@ const reviewSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Simple helpful voting
-    helpfulCount: {
-      type: Number,
-      default: 0,
-      min: 0,
+    // Helpful voting system
+    helpfulVotes: {
+      helpful: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      notHelpful: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      userVotes: [
+        {
+          userId: {
+            type: String,
+            required: true,
+          },
+          vote: {
+            type: String,
+            enum: ['helpful', 'notHelpful'],
+            required: true,
+          },
+          votedAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
     },
 
     // Audit fields (4-field pattern)

@@ -16,6 +16,7 @@ import {
   getProductRatingsBatch,
   bulkDeleteReviews,
   getInternalStats,
+  getAllReviews,
 } from '../controllers/review.controller.js';
 import { authenticateUser, optionalAuth, requireRole } from '../middlewares/auth.middleware.js';
 import { validateRequest } from '../middlewares/validation.middleware.js';
@@ -42,6 +43,7 @@ router.get('/products/:productId/rating', optionalAuth, getProductRating);
 router.post('/products/ratings/batch', optionalAuth, getProductRatingsBatch);
 
 // Admin routes (require admin role)
+router.get('/admin/all', authenticateUser, requireRole(['admin']), getAllReviews);
 router.post('/admin/bulk-delete', authenticateUser, requireRole(['admin']), bulkDeleteReviews);
 router.get('/admin/stats', authenticateUser, requireRole(['admin']), getInternalStats);
 
