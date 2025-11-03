@@ -527,9 +527,6 @@ export const getProductRatingsBatch = async (req, res) => {
       return finalRating;
     });
 
-    console.log('[ReviewController] === FINAL RESULT ===');
-    console.log('[ReviewController] Returning result:', JSON.stringify(result, null, 2));
-
     span.setStatus(1);
     logger.operationComplete('getProductRatingsBatch', startTime, req, {
       requestedCount: productIds.length,
@@ -541,8 +538,6 @@ export const getProductRatingsBatch = async (req, res) => {
       message: 'Product ratings retrieved',
       data: result,
     };
-    console.log('[ReviewController] Sending response:', JSON.stringify(responseData, null, 2));
-
     res.status(200).json(responseData);
   } catch (error) {
     console.error('[ReviewController] ERROR in getProductRatingsBatch:', error);

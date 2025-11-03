@@ -188,21 +188,12 @@ class ReviewService {
       // Build filter
       const filter = { productId: new mongoose.Types.ObjectId(productId) };
 
-      // Debug logging
-      console.log('[DEBUG] getProductReviews - productId:', productId);
-      console.log('[DEBUG] getProductReviews - filter:', filter);
-      console.log('[DEBUG] getProductReviews - status:', status);
-      console.log('[DEBUG] getProductReviews - filter:', filter);
-      console.log('[DEBUG] getProductReviews - options:', options);
-
       // Status filter
       if (Array.isArray(status)) {
         filter.status = { $in: status };
       } else {
         filter.status = status;
       }
-
-      console.log('[DEBUG] getProductReviews - after status filter:', filter);
 
       // Rating filter
       if (rating) {
@@ -249,17 +240,11 @@ class ReviewService {
 
       const skip = (page - 1) * limit;
 
-      console.log('[DEBUG] getProductReviews - final filter before query:', JSON.stringify(filter, null, 2));
-      console.log('[DEBUG] getProductReviews - sort:', sort);
-
       // Execute queries in parallel
       const [reviews, total] = await Promise.all([
         Review.find(filter).sort(sort).skip(skip).limit(limit).select('-__v -helpfulVotes.userVotes').lean(),
         Review.countDocuments(filter),
       ]);
-
-      console.log('[DEBUG] getProductReviews - query results - reviews found:', reviews.length);
-      console.log('[DEBUG] getProductReviews - query results - total count:', total);
 
       // Add virtual fields manually for lean queries
       const enrichedReviews = reviews.map((review) => ({
@@ -682,11 +667,10 @@ class ReviewService {
       let objectId;
       try {
         objectId = new mongoose.Types.ObjectId(productId);
-        console.log('Converting productId:', productId, 'to ObjectId:', objectId);
       } catch (error) {
         // If conversion fails, keep original string ID
         objectId = productId;
-        console.log('Failed to convert productId:', productId, 'keeping as string');
+        logger.info('Failed to convert productId:', productId, 'keeping as string');
       }
 
       // Aggregate review data from reviews collection
