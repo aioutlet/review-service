@@ -54,4 +54,8 @@ dapr run \
   --dapr-http-port $DAPR_HTTP_PORT \
   --dapr-grpc-port $DAPR_GRPC_PORT \
   --resources-path .dapr/components \
+  --config .dapr/config.yaml \
+  --enable-api-logging=false \
+  --placement-host-address "" \
+  --log-level warn \
   -- npm run dev
