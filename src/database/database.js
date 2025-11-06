@@ -1,25 +1,21 @@
 import mongoose from 'mongoose';
 import config from '../core/config.js';
 import { logger } from '../core/index.js';
+import { secretManager } from '../services/dapr.secretManager.js';
 
 const connectDB = async () => {
   try {
-    // Construct MongoDB URI from environment variables directly
-    const mongoHost = process.env.MONGODB_HOST || 'localhost';
-    const mongoPort = process.env.MONGODB_PORT || '27017';
-    const mongoUsername = process.env.MONGO_INITDB_ROOT_USERNAME;
-    const mongoPassword = process.env.MONGO_INITDB_ROOT_PASSWORD;
-    const mongoDatabase = process.env.MONGO_INITDB_DATABASE || 'aioutlet_reviews';
-    const mongoAuthSource = process.env.MONGODB_AUTH_SOURCE || 'admin';
+    // Get database configuration from Dapr Secret Manager
+    const dbConfig = await secretManager.getDatabaseConfig();
 
     let mongodb_uri;
-    if (mongoUsername && mongoPassword) {
-      mongodb_uri = `mongodb://${mongoUsername}:${mongoPassword}@${mongoHost}:${mongoPort}/${mongoDatabase}?authSource=${mongoAuthSource}`;
+    if (dbConfig.username && dbConfig.password) {
+      mongodb_uri = `mongodb://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}?authSource=${dbConfig.authSource}`;
     } else {
-      mongodb_uri = `mongodb://${mongoHost}:${mongoPort}/${mongoDatabase}`;
+      mongodb_uri = `mongodb://${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
     }
 
-    logger.info(`Connecting to MongoDB: ${mongoHost}:${mongoPort}/${mongoDatabase}`);
+    logger.info(`Connecting to MongoDB: ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
 
     // Set global promise library
     mongoose.Promise = global.Promise;

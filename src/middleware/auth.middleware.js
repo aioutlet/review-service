@@ -1,6 +1,20 @@
 import jwt from 'jsonwebtoken';
 import { config, logger } from '../core/index.js';
 import ErrorResponse from '../core/errors.js';
+import { secretManager } from '../services/dapr.secretManager.js';
+
+// Cache JWT config to avoid fetching on every request
+let jwtConfig = null;
+
+/**
+ * Get JWT configuration (cached)
+ */
+const getJwtConfig = async () => {
+  if (!jwtConfig) {
+    jwtConfig = await secretManager.getJwtConfig();
+  }
+  return jwtConfig;
+};
 
 /**
  * Middleware to verify JWT token
@@ -8,7 +22,7 @@ import ErrorResponse from '../core/errors.js';
  * @param {Object} res - Express response object
  * @param {Function} next - Next middleware function
  */
-export const verifyToken = (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -26,7 +40,8 @@ export const verifyToken = (req, res, next) => {
       throw new ErrorResponse('Token missing', 401);
     }
 
-    const decoded = jwt.verify(token, config.security.jwtSecret);
+    const jwtCfg = await getJwtConfig();
+    const decoded = jwt.verify(token, jwtCfg.secret);
 
     // Add user information to request
     req.user = {

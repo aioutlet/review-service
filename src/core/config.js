@@ -12,6 +12,8 @@ const config = {
   },
   database: {
     // Construct MongoDB URI from environment variables
+    // Note: This is the initial config. The actual URI will be constructed
+    // using secrets from Dapr Secret Manager when database connects
     uri: (() => {
       const mongoHost = process.env.MONGODB_HOST || 'localhost';
       const mongoPort = process.env.MONGODB_PORT || '27017';
@@ -37,6 +39,9 @@ const config = {
   security: {
     jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
     corsOrigin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+  },
+  service: {
+    name: process.env.SERVICE_NAME || 'review-service',
   },
   messaging: {
     rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://localhost:5672',

@@ -1,0 +1,57 @@
+#!/bin/bash
+# Dapr run script for Review Service
+
+echo "🚀 Starting Review Service with Dapr..."
+
+# Set Dapr app configuration
+export DAPR_APP_ID=review-service
+export DAPR_HTTP_PORT=3501
+export DAPR_GRPC_PORT=50002
+export DAPR_APP_PORT=9001
+
+echo "📦 Dapr Configuration:"
+echo "   App ID: $DAPR_APP_ID"
+echo "   HTTP Port: $DAPR_HTTP_PORT"
+echo "   gRPC Port: $DAPR_GRPC_PORT"
+echo "   App Port: $DAPR_APP_PORT"
+echo ""
+
+# Check if Dapr is installed
+if ! command -v dapr &> /dev/null; then
+    echo "❌ Dapr CLI is not installed!"
+    echo "Please install Dapr CLI: https://docs.dapr.io/getting-started/install-dapr-cli/"
+    exit 1
+fi
+
+echo "🔍 Checking dependencies..."
+
+# Check if RabbitMQ is available
+if ! docker ps --filter "name=rabbitmq-message-broker" --format "table {{.Names}}" | grep -q rabbitmq-message-broker; then
+    echo "⚠️ RabbitMQ container is not running!"
+    echo "Please start RabbitMQ: docker-compose -f scripts/docker-compose/docker-compose.yml up -d rabbitmq"
+    exit 1
+else
+    echo "✅ RabbitMQ container is running"
+fi
+
+# Check if MongoDB is available
+if ! docker ps --filter "name=mongodb-reviews" --format "table {{.Names}}" | grep -q mongodb-reviews; then
+    echo "⚠️ MongoDB container is not running!"
+    echo "Please start MongoDB: docker-compose -f scripts/docker-compose/docker-compose.yml up -d mongodb-reviews"
+    exit 1
+else
+    echo "✅ MongoDB container is running"
+fi
+
+echo ""
+echo "🏁 Starting Review Service with Dapr sidecar..."
+echo ""
+
+# Start the review service with Dapr
+dapr run \
+  --app-id $DAPR_APP_ID \
+  --app-port $DAPR_APP_PORT \
+  --dapr-http-port $DAPR_HTTP_PORT \
+  --dapr-grpc-port $DAPR_GRPC_PORT \
+  --resources-path .dapr/components \
+  -- npm run dev
