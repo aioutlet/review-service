@@ -1,4 +1,4 @@
-import { config } from '../core/index.js';
+import config from '../core/config.js';
 
 /**
  * Service information endpoint

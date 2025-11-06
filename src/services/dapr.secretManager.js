@@ -144,7 +144,7 @@ class DaprSecretManager {
     ]);
 
     return {
-      host: host || 'localhost',
+      host: host || '127.0.0.1',
       port: parseInt(port || '27017', 10),
       username: username || null,
       password: password || null,
@@ -158,10 +158,7 @@ class DaprSecretManager {
    * @returns {Promise<Object>} JWT configuration parameters
    */
   async getJwtConfig() {
-    const [secret, algorithm] = await Promise.all([
-      this.getSecret('JWT_SECRET'),
-      this.getSecret('JWT_ALGORITHM'),
-    ]);
+    const [secret, algorithm] = await Promise.all([this.getSecret('JWT_SECRET'), this.getSecret('JWT_ALGORITHM')]);
 
     return {
       secret: secret || 'your-secret-key',

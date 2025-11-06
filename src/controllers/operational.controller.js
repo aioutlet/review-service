@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
-import { logger, config } from '../core/index.js';
+import { logger } from '../core/logger.js';
+import config from '../core/config.js';
 import eventPublisher from '../events/publisher.js';
 
 export function health(req, res) {

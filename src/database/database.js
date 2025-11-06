@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
-import config from '../core/config.js';
-import { logger } from '../core/index.js';
+import { logger } from '../core/logger.js';
 import { secretManager } from '../services/dapr.secretManager.js';
 
 const connectDB = async () => {
@@ -8,14 +7,17 @@ const connectDB = async () => {
     // Get database configuration from Dapr Secret Manager
     const dbConfig = await secretManager.getDatabaseConfig();
 
+    // Force IPv4 by replacing 'localhost' with '127.0.0.1'
+    const host = dbConfig.host === 'localhost' ? '127.0.0.1' : dbConfig.host;
+
     let mongodb_uri;
     if (dbConfig.username && dbConfig.password) {
-      mongodb_uri = `mongodb://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}?authSource=${dbConfig.authSource}`;
+      mongodb_uri = `mongodb://${dbConfig.username}:${dbConfig.password}@${host}:${dbConfig.port}/${dbConfig.database}?authSource=${dbConfig.authSource}`;
     } else {
-      mongodb_uri = `mongodb://${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
+      mongodb_uri = `mongodb://${host}:${dbConfig.port}/${dbConfig.database}`;
     }
 
-    logger.info(`Connecting to MongoDB: ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
+    logger.info(`Connecting to MongoDB: ${host}:${dbConfig.port}/${dbConfig.database}`);
 
     // Set global promise library
     mongoose.Promise = global.Promise;
@@ -30,6 +32,7 @@ const connectDB = async () => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      family: 4, // Force IPv4
     });
 
     logger.info(`MongoDB connected: ${conn.connection.host}:${conn.connection.port}/${conn.connection.name}`);

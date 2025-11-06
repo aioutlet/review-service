@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { config, logger } from '../core/index.js';
+import config from '../core/config.js';
+import { logger } from '../core/logger.js';
 import ErrorResponse from '../core/errors.js';
 import { secretManager } from '../services/dapr.secretManager.js';
 

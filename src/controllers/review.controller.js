@@ -1,5 +1,5 @@
 import reviewService from '../services/review.service.js';
-import { logger } from '../core/index.js';
+import { logger } from '../core/logger.js';
 import { asyncHandler } from '../middleware/asyncHandler.middleware.js';
 
 /**

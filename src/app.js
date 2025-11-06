@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 
-import { config, logger } from './core/index.js';
+import config from './core/config.js';
+import { logger } from './core/logger.js';
 import connectDB from './database/database.js';
 import correlationIdMiddleware from './middleware/correlationId.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';

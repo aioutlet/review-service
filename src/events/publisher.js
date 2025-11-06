@@ -4,7 +4,8 @@
  */
 
 import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
-import { config, logger } from '../core/index.js';
+import config from '../core/config.js';
+import { logger } from '../core/logger.js';
 
 class DaprEventPublisher {
   constructor() {

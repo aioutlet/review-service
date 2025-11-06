@@ -1,8 +1,8 @@
 import Review from '../models/review.model.js';
-import { logger } from '../core/index.js';
+import { logger } from '../core/logger.js';
 import ErrorResponse from '../core/errors.js';
 import eventPublisher from '../events/publisher.js';
-import { config } from '../core/index.js';
+import config from '../core/config.js';
 import mongoose from 'mongoose';
 
 class ReviewService {

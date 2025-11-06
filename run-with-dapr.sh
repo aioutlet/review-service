@@ -35,9 +35,9 @@ else
 fi
 
 # Check if MongoDB is available
-if ! docker ps --filter "name=mongodb-reviews" --format "table {{.Names}}" | grep -q mongodb-reviews; then
+if ! docker ps --filter "name=review-mongodb" --format "table {{.Names}}" | grep -q review-mongodb; then
     echo "⚠️ MongoDB container is not running!"
-    echo "Please start MongoDB: docker-compose -f scripts/docker-compose/docker-compose.yml up -d mongodb-reviews"
+    echo "Please start MongoDB: docker-compose -f scripts/docker-compose/docker-compose.yml up -d review-mongodb"
     exit 1
 else
     echo "✅ MongoDB container is running"

@@ -7,7 +7,6 @@ import {
   deleteReview,
   voteOnReview,
   getUserReviews,
-  bulkDeleteReviews,
   getInternalStats,
   getAllReviews,
 } from '../controllers/review.controller.js';
@@ -28,7 +27,6 @@ router.get('/user/my-reviews', authenticateUser, getUserReviews);
 
 // Admin routes (require admin role)
 router.get('/admin/all', authenticateUser, requireRole(['admin']), getAllReviews);
-router.post('/admin/bulk-delete', authenticateUser, requireRole(['admin']), bulkDeleteReviews);
 router.get('/admin/stats', authenticateUser, requireRole(['admin']), getInternalStats);
 
 export default router;
