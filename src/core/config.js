@@ -40,23 +40,11 @@ const config = {
     jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
     corsOrigin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
   },
-  service: {
-    name: process.env.SERVICE_NAME || 'review-service',
-  },
-  messaging: {
-    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
-    exchanges: {
-      reviews: 'reviews.exchange',
-      orders: 'orders.exchange',
-      users: 'users.exchange',
-      products: 'products.exchange',
-    },
-    queues: {
-      reviewEvents: 'review.events',
-      orderCompleted: 'review.order.completed',
-      userDeleted: 'review.user.deleted',
-      productDeleted: 'review.product.deleted',
-    },
+  dapr: {
+    httpPort: process.env.DAPR_HTTP_PORT || '3501',
+    host: process.env.DAPR_HOST || 'localhost',
+    pubsubName: process.env.DAPR_PUBSUB_NAME || 'review-pubsub',
+    appId: process.env.DAPR_APP_ID || 'review-service',
   },
   upload: {
     maxFileSize: process.env.MAX_FILE_SIZE || '10MB',

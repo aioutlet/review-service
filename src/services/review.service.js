@@ -185,8 +185,8 @@ class ReviewService {
       throw new ErrorResponse('Review not found', 404);
     }
 
-    // Check ownership
-    if (review.userId !== userId) {
+    // Check ownership - ensure both are strings for comparison
+    if (review.userId.toString() !== userId.toString()) {
       throw new ErrorResponse('You can only update your own reviews', 403);
     }
 
@@ -231,7 +231,7 @@ class ReviewService {
       throw new ErrorResponse('Review not found', 404);
     }
 
-    if (review.userId !== userId) {
+    if (review.userId.toString() !== userId.toString()) {
       throw new ErrorResponse('You can only delete your own reviews', 403);
     }
 
@@ -350,7 +350,7 @@ class ReviewService {
       ...review,
       helpfulScore: this.calculateHelpfulScore(review.helpfulVotes),
       totalVotes: review.helpfulVotes.helpful + review.helpfulVotes.notHelpful,
-      ageInDays: Math.floor((Date.now() - review.metadata.createdAt) / (1000 * 60 * 60 * 24)),
+      ageInDays: Math.floor((Date.now() - new Date(review.createdAt)) / (1000 * 60 * 60 * 24)),
     };
 
     if (userId) {

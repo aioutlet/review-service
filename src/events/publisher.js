@@ -9,8 +9,8 @@ import { logger } from '../core/logger.js';
 
 class DaprEventPublisher {
   constructor() {
+    this.serviceName = config.serviceName;
     this.pubsubName = process.env.DAPR_PUBSUB_NAME || 'review-pubsub';
-    this.serviceName = config.service.name;
     this.daprHost = process.env.DAPR_HOST || '127.0.0.1';
     this.daprPort = process.env.DAPR_HTTP_PORT || '3500';
     this.client = null;
