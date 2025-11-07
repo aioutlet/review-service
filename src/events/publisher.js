@@ -75,21 +75,68 @@ class DaprEventPublisher {
    * Publish review.created event
    */
   async publishReviewCreated(review, correlationId = null) {
-    return this.publishEvent('review-events', 'review.created', review, correlationId);
+    const eventData = {
+      reviewId: review.reviewId,
+      productId: review.productId,
+      userId: review.userId,
+      rating: review.rating,
+      title: review.title || '',
+      comment: review.comment || '',
+      verified: review.isVerifiedPurchase || false,
+      createdAt: review.createdAt,
+      metadata: {
+        eventVersion: '1.0',
+        retryCount: 0,
+        source: 'review-service',
+        environment: process.env.NODE_ENV || 'development',
+      },
+    };
+    return this.publishEvent('review.created', 'review.created', eventData, correlationId);
   }
 
   /**
    * Publish review.updated event
    */
   async publishReviewUpdated(review, correlationId = null) {
-    return this.publishEvent('review-events', 'review.updated', review, correlationId);
+    const eventData = {
+      reviewId: review.reviewId,
+      productId: review.productId,
+      userId: review.userId,
+      rating: review.rating,
+      previousRating: review.previousRating || null,
+      title: review.title || '',
+      comment: review.comment || '',
+      verified: review.isVerifiedPurchase || false,
+      updatedAt: review.updatedAt || new Date().toISOString(),
+      metadata: {
+        eventVersion: '1.0',
+        retryCount: 0,
+        source: 'review-service',
+        environment: process.env.NODE_ENV || 'development',
+      },
+    };
+    return this.publishEvent('review.updated', 'review.updated', eventData, correlationId);
   }
 
   /**
    * Publish review.deleted event
    */
-  async publishReviewDeleted(reviewId, productId, correlationId = null) {
-    return this.publishEvent('review-events', 'review.deleted', { reviewId, productId }, correlationId);
+  async publishReviewDeleted(data, correlationId = null) {
+    const eventData = {
+      reviewId: data.reviewId,
+      productId: data.productId,
+      userId: data.userId,
+      rating: data.rating || 0,
+      verified: data.isVerifiedPurchase || false,
+      deletedAt: new Date().toISOString(),
+      metadata: {
+        eventVersion: '1.0',
+        retryCount: 0,
+        source: 'review-service',
+        environment: process.env.NODE_ENV || 'development',
+      },
+    };
+    return this.publishEvent('review.deleted', 'review.deleted', eventData, correlationId);
   }
 
   /**

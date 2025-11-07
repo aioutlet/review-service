@@ -63,9 +63,9 @@ class ReviewService {
         productId: savedReview.productId,
         userId: savedReview.userId,
         rating: savedReview.rating,
-        status: savedReview.status,
-        isVerifiedPurchase: savedReview.isVerifiedPurchase,
+        title: savedReview.title,
         comment: savedReview.comment,
+        isVerifiedPurchase: savedReview.isVerifiedPurchase,
         createdAt: savedReview.createdAt,
       },
       correlationId
@@ -190,6 +190,9 @@ class ReviewService {
       throw new ErrorResponse('You can only update your own reviews', 403);
     }
 
+    // Store previous rating for event
+    const previousRating = review.rating;
+
     // Validate and apply updates
     const allowedFields = ['rating', 'title', 'comment', 'images', 'videos'];
     allowedFields.forEach((field) => {
@@ -214,7 +217,11 @@ class ReviewService {
         productId: updatedReview.productId,
         userId: updatedReview.userId,
         rating: updatedReview.rating,
-        status: updatedReview.status,
+        previousRating,
+        title: updatedReview.title,
+        comment: updatedReview.comment,
+        isVerifiedPurchase: updatedReview.isVerifiedPurchase,
+        updatedAt: updatedReview.updatedAt,
       },
       correlationId
     );
@@ -236,6 +243,9 @@ class ReviewService {
     }
 
     const productId = review.productId;
+    const rating = review.rating;
+    const isVerifiedPurchase = review.isVerifiedPurchase;
+
     await Review.findByIdAndDelete(reviewId);
 
     // Publish event
@@ -244,6 +254,8 @@ class ReviewService {
         reviewId,
         productId,
         userId: review.userId,
+        rating,
+        isVerifiedPurchase,
       },
       correlationId
     );
