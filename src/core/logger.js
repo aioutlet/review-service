@@ -3,7 +3,7 @@ import winston from 'winston';
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const IS_TEST = process.env.NODE_ENV === 'test';
-const SERVICE_NAME = process.env.SERVICE_NAME || 'review-service';
+const NAME = process.env.NAME || 'review-service';
 const LOG_FORMAT = process.env.LOG_FORMAT || (IS_PRODUCTION ? 'json' : 'console');
 
 /**
@@ -22,7 +22,7 @@ const consoleFormat = winston.format.printf(({ level, message, timestamp, correl
   const corrId = correlationId ? `[${correlationId}]` : '[no-correlation]';
   const metaStr = Object.keys(meta).length > 0 ? ` | ${JSON.stringify(meta)}` : '';
 
-  return `${color}[${timestamp}] [${level.toUpperCase()}] ${SERVICE_NAME} ${corrId}: ${message}${metaStr}${reset}`;
+  return `${color}[${timestamp}] [${level.toUpperCase()}] ${NAME} ${corrId}: ${message}${metaStr}${reset}`;
 });
 
 /**
@@ -32,7 +32,7 @@ const jsonFormat = winston.format.printf(({ level, message, timestamp, correlati
   return JSON.stringify({
     timestamp,
     level,
-    service: SERVICE_NAME,
+    service: NAME,
     correlationId: correlationId || null,
     message,
     ...meta,
@@ -58,7 +58,7 @@ const createWinstonLogger = () => {
   if (process.env.LOG_TO_FILE === 'true') {
     transports.push(
       new winston.transports.File({
-        filename: `./logs/${SERVICE_NAME}.log`,
+        filename: `./logs/${NAME}.log`,
         format: winston.format.combine(winston.format.timestamp(), jsonFormat),
       })
     );

@@ -3,8 +3,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const config = {
-  serviceName: process.env.SERVICE_NAME || 'review-service',
-  serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
+  serviceName: process.env.NAME || 'review-service',
+  serviceVersion: process.env.VERSION || '1.0.0',
   env: process.env.NODE_ENV || 'development',
   server: {
     port: process.env.PORT || 9001,
