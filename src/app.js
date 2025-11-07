@@ -7,6 +7,7 @@ import connectDB from './database/database.js';
 import correlationIdMiddleware from './middleware/correlationId.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import reviewRoutes from './routes/review.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import homeRoutes from './routes/home.routes.js';
 import operationalRoutes from './routes/operational.routes.js';
 
@@ -32,6 +33,7 @@ await connectDB();
 app.use('/', homeRoutes);
 app.use('/', operationalRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -115,7 +115,7 @@ export const getUserReviews = asyncHandler(async (req, res) => {
 /**
  * Get internal review stats (admin only)
  */
-export const getInternalStats = asyncHandler(async (req, res) => {
+export const getStats = asyncHandler(async (req, res) => {
   const stats = await reviewService.getInternalStats(req.correlationId);
 
   res.status(200).json({

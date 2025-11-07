@@ -29,22 +29,18 @@ The Review Service manages product reviews, ratings, and moderation for the AI O
 
 ### Public Endpoints
 
-- `GET /api/v1/reviews/product/:productId` - Get product reviews
-- `POST /api/v1/reviews` - Create review
-- `PATCH /api/v1/reviews/:reviewId` - Update review
-- `DELETE /api/v1/reviews/:reviewId` - Delete review
-- `POST /api/v1/reviews/:reviewId/vote` - Vote on review helpfulness
+- `GET /api/reviews/product/:productId` - Get product reviews
+- `GET /api/reviews/:reviewId` - Get review by ID
+- `POST /api/reviews` - Create review
+- `PUT /api/reviews/:reviewId` - Update review
+- `DELETE /api/reviews/:reviewId` - Delete review
+- `POST /api/reviews/:reviewId/vote` - Vote on review helpfulness
+- `GET /api/reviews/user/my-reviews` - Get user's own reviews
 
 ### Admin Endpoints
 
-- `GET /api/v1/moderation/reviews/pending` - Get pending reviews
-- `PATCH /api/v1/moderation/reviews/:reviewId` - Moderate review
-- `GET /api/v1/analytics/reviews/stats` - Get review statistics
-
-### Internal Endpoints
-
-- `GET /api/v1/internal/products/:productId/rating` - Get product rating
-- `POST /api/v1/internal/reviews/bulk-update` - Bulk update reviews
+- `GET /api/admin/reviews/all` - Get all reviews
+- `GET /api/admin/reviews/stats` - Get review statistics
 
 ### Operational Endpoints
 

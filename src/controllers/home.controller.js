@@ -12,7 +12,7 @@ export const info = (req, res) => {
     environment: config.env,
     timestamp: new Date().toISOString(),
     endpoints: {
-      reviews: '/api/v1/reviews',
+      reviews: '/api/reviews',
       health: '/health',
       readiness: '/health/ready',
       liveness: '/health/live',
