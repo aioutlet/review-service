@@ -10,34 +10,8 @@ const config = {
     port: process.env.PORT || 9001,
     host: process.env.HOST || '0.0.0.0',
   },
-  database: {
-    // Construct MongoDB URI from environment variables
-    // Note: This is the initial config. The actual URI will be constructed
-    // using secrets from Dapr Secret Manager when database connects
-    uri: (() => {
-      const mongoHost = process.env.MONGODB_HOST || 'localhost';
-      const mongoPort = process.env.MONGODB_PORT || '27017';
-      const mongoUsername = process.env.MONGO_INITDB_ROOT_USERNAME;
-      const mongoPassword = process.env.MONGO_INITDB_ROOT_PASSWORD;
-      const mongoDatabase = process.env.MONGO_INITDB_DATABASE || 'aioutlet_reviews';
-      const mongoAuthSource = process.env.MONGODB_AUTH_SOURCE || 'admin';
-
-      if (mongoUsername && mongoPassword) {
-        return `mongodb://${mongoUsername}:${mongoPassword}@${mongoHost}:${mongoPort}/${mongoDatabase}?authSource=${mongoAuthSource}`;
-      } else {
-        return `mongodb://${mongoHost}:${mongoPort}/${mongoDatabase}`;
-      }
-    })(),
-    options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-    },
-  },
   security: {
-    jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
+    // For JWT secret, use: await getJwtConfig() from dapr.secretManager
     corsOrigin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
   },
   dapr: {

@@ -165,35 +165,6 @@ class DaprSecretManager {
       algorithm: algorithm || 'HS256',
     };
   }
-
-  /**
-   * Get RabbitMQ configuration from secrets or environment variables
-   * @returns {Promise<Object>} RabbitMQ configuration parameters
-   */
-  async getRabbitMQConfig() {
-    const [url, host, port, username, password] = await Promise.all([
-      this.getSecret('RABBITMQ_URL'),
-      this.getSecret('RABBITMQ_HOST'),
-      this.getSecret('RABBITMQ_PORT'),
-      this.getSecret('RABBITMQ_USERNAME'),
-      this.getSecret('RABBITMQ_PASSWORD'),
-    ]);
-
-    // If URL is provided, use it directly
-    if (url) {
-      return { url };
-    }
-
-    // Otherwise construct from individual components
-    const rabbitHost = host || 'localhost';
-    const rabbitPort = port || '5672';
-    const rabbitUser = username || 'guest';
-    const rabbitPass = password || 'guest';
-
-    return {
-      url: `amqp://${rabbitUser}:${rabbitPass}@${rabbitHost}:${rabbitPort}`,
-    };
-  }
 }
 
 // Global instance
@@ -202,4 +173,3 @@ export const secretManager = new DaprSecretManager();
 // Helper functions for easy access
 export const getDatabaseConfig = () => secretManager.getDatabaseConfig();
 export const getJwtConfig = () => secretManager.getJwtConfig();
-export const getRabbitMQConfig = () => secretManager.getRabbitMQConfig();
