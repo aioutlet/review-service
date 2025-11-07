@@ -8,7 +8,7 @@
     "start": "node src/server.js",
     "prod": "NODE_ENV=production node src/server.js",
     "dev": "nodemon src/server.js",
-    "dapr": "cross-env DAPR_ENABLED=true dotenv -e .env -- dapr run --app-id review-service --app-port 9001 --dapr-http-port 3501 --dapr-grpc-port 50002 --resources-path .dapr/components --config .dapr/config.yaml --enable-api-logging=false --placement-host-address \"\" --log-level warn -- node src/server.js",
+    "dapr": "cross-env DAPR_ENABLED=true dotenv -e .env -- dapr run --app-id review-service --app-port 9001 --dapr-http-port 3501 --dapr-grpc-port 50002 --resources-path .dapr/components --config .dapr/config.yaml --log-level warn -- node src/server.js",
     "test": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --runInBand",
     "test:integration": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --runInBand tests/integration/",
     "test:e2e": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --runInBand tests/e2e/dapr-event-flow-manual.e2e.test.js --testTimeout=30000",
