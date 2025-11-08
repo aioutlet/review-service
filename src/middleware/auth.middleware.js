@@ -42,7 +42,9 @@ export const verifyToken = async (req, res, next) => {
     }
 
     const jwtCfg = await getJwtConfig();
-    const decoded = jwt.verify(token, jwtCfg.secret);
+    const decoded = jwt.verify(token, jwtCfg.secret, {
+      audience: 'aioutlet-platform', // Verify audience matches auth-service
+    });
 
     // Add user information to request
     req.user = {
