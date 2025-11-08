@@ -10,6 +10,7 @@ import reviewRoutes from './routes/review.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import homeRoutes from './routes/home.routes.js';
 import operationalRoutes from './routes/operational.routes.js';
+import eventPublisher from './events/publisher.js';
 
 const app = express();
 app.set('trust proxy', true);
@@ -28,6 +29,16 @@ app.use(express.urlencoded({ extended: true }));
 
 // Connect to database
 await connectDB();
+
+// Initialize event publisher for Dapr pub/sub
+try {
+  eventPublisher.initialize();
+  logger.info('Event publisher initialized successfully');
+} catch (error) {
+  logger.warn('Failed to initialize event publisher. Events will not be published.', {
+    error: error.message,
+  });
+}
 
 // Routes
 app.use('/', homeRoutes);

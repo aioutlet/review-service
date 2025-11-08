@@ -76,67 +76,155 @@ class DaprEventPublisher {
    */
   async publishReviewCreated(review, correlationId = null) {
     const eventData = {
-      reviewId: review.reviewId,
-      productId: review.productId,
-      userId: review.userId,
+      reviewId: review._id?.toString() || review.reviewId,
+      productId: review.productId?.toString() || review.productId,
+      userId: review.userId?.toString() || review.userId,
+      username: review.username,
       rating: review.rating,
       title: review.title || '',
       comment: review.comment || '',
-      verified: review.isVerifiedPurchase || false,
-      createdAt: review.createdAt,
-      metadata: {
-        eventVersion: '1.0',
-        retryCount: 0,
-        source: 'review-service',
-        environment: process.env.NODE_ENV || 'development',
-      },
+      isVerifiedPurchase: review.isVerifiedPurchase || false,
+      orderReference: review.orderReference || null,
+      status: review.status || 'pending',
+      helpfulCount: review.helpfulVotes?.helpful || 0,
+      createdAt: review.createdAt?.toISOString() || new Date().toISOString(),
     };
-    return this.publishEvent('review.created', 'review.created', eventData, correlationId);
+
+    const metadata = {
+      correlationId: correlationId || `review-${eventData.reviewId}`,
+      userId: eventData.userId,
+      causationId: review.orderReference || null,
+    };
+
+    const cloudEvent = {
+      specversion: '1.0',
+      type: 'review.created',
+      source: this.serviceName,
+      id: correlationId || `review-created-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      time: new Date().toISOString(),
+      datacontenttype: 'application/json',
+      data: eventData,
+      metadata: metadata,
+    };
+
+    if (!this.client) {
+      logger.warn('Dapr client not initialized. Skipping review.created event.', {
+        reviewId: eventData.reviewId,
+      });
+      return false;
+    }
+
+    await this.client.pubsub.publish(this.pubsubName, 'review-events', cloudEvent);
+
+    logger.info('Review created event published', {
+      reviewId: eventData.reviewId,
+      productId: eventData.productId,
+      correlationId: metadata.correlationId,
+    });
+
+    return true;
   }
 
   /**
    * Publish review.updated event
    */
-  async publishReviewUpdated(review, correlationId = null) {
+  async publishReviewUpdated(review, previousRating, correlationId = null) {
     const eventData = {
-      reviewId: review.reviewId,
-      productId: review.productId,
-      userId: review.userId,
+      reviewId: review._id?.toString() || review.reviewId,
+      productId: review.productId?.toString() || review.productId,
+      userId: review.userId?.toString() || review.userId,
+      username: review.username,
       rating: review.rating,
-      previousRating: review.previousRating || null,
+      previousRating: previousRating,
       title: review.title || '',
       comment: review.comment || '',
-      verified: review.isVerifiedPurchase || false,
-      updatedAt: review.updatedAt || new Date().toISOString(),
-      metadata: {
-        eventVersion: '1.0',
-        retryCount: 0,
-        source: 'review-service',
-        environment: process.env.NODE_ENV || 'development',
-      },
+      isVerifiedPurchase: review.isVerifiedPurchase || false,
+      status: review.status || 'pending',
+      updatedAt: review.updatedAt?.toISOString() || new Date().toISOString(),
     };
-    return this.publishEvent('review.updated', 'review.updated', eventData, correlationId);
+
+    const metadata = {
+      correlationId: correlationId || `review-update-${eventData.reviewId}`,
+      userId: eventData.userId,
+    };
+
+    const cloudEvent = {
+      specversion: '1.0',
+      type: 'review.updated',
+      source: this.serviceName,
+      id: correlationId || `review-updated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      time: new Date().toISOString(),
+      datacontenttype: 'application/json',
+      data: eventData,
+      metadata: metadata,
+    };
+
+    if (!this.client) {
+      logger.warn('Dapr client not initialized. Skipping review.updated event.', {
+        reviewId: eventData.reviewId,
+      });
+      return false;
+    }
+
+    await this.client.pubsub.publish(this.pubsubName, 'review-events', cloudEvent);
+
+    logger.info('Review updated event published', {
+      reviewId: eventData.reviewId,
+      productId: eventData.productId,
+      previousRating,
+      newRating: eventData.rating,
+      correlationId: metadata.correlationId,
+    });
+
+    return true;
   }
 
   /**
    * Publish review.deleted event
    */
-  async publishReviewDeleted(data, correlationId = null) {
+  async publishReviewDeleted(review, correlationId = null) {
     const eventData = {
-      reviewId: data.reviewId,
-      productId: data.productId,
-      userId: data.userId,
-      rating: data.rating || 0,
-      verified: data.isVerifiedPurchase || false,
+      reviewId: review._id?.toString() || review.reviewId,
+      productId: review.productId?.toString() || review.productId,
+      userId: review.userId?.toString() || review.userId,
+      rating: review.rating || 0,
+      isVerifiedPurchase: review.isVerifiedPurchase || false,
       deletedAt: new Date().toISOString(),
-      metadata: {
-        eventVersion: '1.0',
-        retryCount: 0,
-        source: 'review-service',
-        environment: process.env.NODE_ENV || 'development',
-      },
+      deletedBy: review.deletedBy || review.userId?.toString(),
     };
-    return this.publishEvent('review.deleted', 'review.deleted', eventData, correlationId);
+
+    const metadata = {
+      correlationId: correlationId || `review-delete-${eventData.reviewId}`,
+      userId: eventData.userId,
+    };
+
+    const cloudEvent = {
+      specversion: '1.0',
+      type: 'review.deleted',
+      source: this.serviceName,
+      id: correlationId || `review-deleted-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      time: new Date().toISOString(),
+      datacontenttype: 'application/json',
+      data: eventData,
+      metadata: metadata,
+    };
+
+    if (!this.client) {
+      logger.warn('Dapr client not initialized. Skipping review.deleted event.', {
+        reviewId: eventData.reviewId,
+      });
+      return false;
+    }
+
+    await this.client.pubsub.publish(this.pubsubName, 'review-events', cloudEvent);
+
+    logger.info('Review deleted event published', {
+      reviewId: eventData.reviewId,
+      productId: eventData.productId,
+      correlationId: metadata.correlationId,
+    });
+
+    return true;
   }
 
   /**

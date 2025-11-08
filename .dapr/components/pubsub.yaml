@@ -36,5 +36,11 @@ spec:
     # Exchange configuration
     - name: exchangeKind
       value: 'topic'
+    # Consumer configuration
+    - name: maxLen
+      value: '1000' # Maximum queue length
+    - name: maxLenBytes
+      value: '10485760' # 10MB max queue size
 scopes:
   - review-service
+  - product-service

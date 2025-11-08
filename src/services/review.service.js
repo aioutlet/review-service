@@ -57,19 +57,22 @@ class ReviewService {
     const savedReview = await review.save();
 
     // Publish event via Dapr - Product service will update rating aggregate
-    await eventPublisher.publishReviewCreated(
-      {
-        reviewId: savedReview._id.toString(),
-        productId: savedReview.productId,
-        userId: savedReview.userId,
-        rating: savedReview.rating,
-        title: savedReview.title,
-        comment: savedReview.comment,
-        isVerifiedPurchase: savedReview.isVerifiedPurchase,
-        createdAt: savedReview.createdAt,
-      },
-      correlationId
-    );
+    try {
+      await eventPublisher.publishReviewCreated(savedReview, correlationId);
+      log.info('Review created event published', {
+        reviewId: savedReview._id,
+        productId: reviewData.productId,
+        userId: user.userId,
+      });
+    } catch (eventError) {
+      log.error('Failed to publish review.created event', {
+        error: eventError.message,
+        reviewId: savedReview._id,
+        productId: reviewData.productId,
+      });
+      // Don't fail the review creation if event publishing fails
+      // Event publishing will be retried or handled by reconciliation job
+    }
 
     log.info('Review created successfully', {
       reviewId: savedReview._id,
@@ -211,20 +214,20 @@ class ReviewService {
     const updatedReview = await review.save();
 
     // Publish event
-    await eventPublisher.publishReviewUpdated(
-      {
-        reviewId: updatedReview._id.toString(),
+    try {
+      await eventPublisher.publishReviewUpdated(updatedReview, previousRating, correlationId);
+      logger.info('Review updated event published', {
+        reviewId: updatedReview._id,
         productId: updatedReview.productId,
-        userId: updatedReview.userId,
-        rating: updatedReview.rating,
         previousRating,
-        title: updatedReview.title,
-        comment: updatedReview.comment,
-        isVerifiedPurchase: updatedReview.isVerifiedPurchase,
-        updatedAt: updatedReview.updatedAt,
-      },
-      correlationId
-    );
+        newRating: updatedReview.rating,
+      });
+    } catch (eventError) {
+      logger.error('Failed to publish review.updated event', {
+        error: eventError.message,
+        reviewId: updatedReview._id,
+      });
+    }
 
     return updatedReview;
   }
@@ -242,23 +245,22 @@ class ReviewService {
       throw new ErrorResponse('You can only delete your own reviews', 403);
     }
 
-    const productId = review.productId;
-    const rating = review.rating;
-    const isVerifiedPurchase = review.isVerifiedPurchase;
-
     await Review.findByIdAndDelete(reviewId);
 
     // Publish event
-    await eventPublisher.publishReviewDeleted(
-      {
+    try {
+      await eventPublisher.publishReviewDeleted(review, correlationId);
+      logger.info('Review deleted event published', {
         reviewId,
-        productId,
+        productId: review.productId,
         userId: review.userId,
-        rating,
-        isVerifiedPurchase,
-      },
-      correlationId
-    );
+      });
+    } catch (eventError) {
+      logger.error('Failed to publish review.deleted event', {
+        error: eventError.message,
+        reviewId,
+      });
+    }
 
     return true;
   }

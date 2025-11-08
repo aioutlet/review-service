@@ -66,7 +66,7 @@ describe('Review-Product Service Event Integration', () => {
 
       // Verify pub/sub name and topic
       expect(publishedEvent.pubsubName).toBe('review-pubsub');
-      expect(publishedEvent.topic).toBe('review.created');
+      expect(publishedEvent.topic).toBe('review-events'); // Updated to match new schema
 
       // Verify CloudEvents structure
       const event = publishedEvent.event;
@@ -81,7 +81,7 @@ describe('Review-Product Service Event Integration', () => {
       expect(event).toHaveProperty('id');
       expect(event).toHaveProperty('time');
 
-      // Verify event data
+      // Verify event data (camelCase for Node.js)
       expect(event.data).toMatchObject({
         reviewId: reviewData.reviewId,
         productId: reviewData.productId,
@@ -89,14 +89,13 @@ describe('Review-Product Service Event Integration', () => {
         rating: reviewData.rating,
         title: reviewData.title,
         comment: reviewData.comment,
-        verified: true,
+        isVerifiedPurchase: true, // Updated field name
       });
 
-      // Verify metadata
-      expect(event.data.metadata).toMatchObject({
-        eventVersion: '1.0',
-        retryCount: 0,
-        source: 'review-service',
+      // Verify metadata structure (updated schema)
+      expect(event.metadata).toMatchObject({
+        correlationId: expect.any(String),
+        userId: reviewData.userId,
       });
     });
 
@@ -143,7 +142,7 @@ describe('Review-Product Service Event Integration', () => {
       expect(publishedEvents).toHaveLength(1);
       const publishedEvent = publishedEvents[0];
 
-      expect(publishedEvent.topic).toBe('review.updated');
+      expect(publishedEvent.topic).toBe('review-events'); // Updated
       expect(publishedEvent.event.type).toBe('review.updated');
 
       const eventData = publishedEvent.event.data;
@@ -153,7 +152,7 @@ describe('Review-Product Service Event Integration', () => {
         userId: reviewData.userId,
         rating: 4,
         previousRating: 3,
-        verified: true,
+        isVerifiedPurchase: true, // Updated field name
       });
 
       expect(eventData).toHaveProperty('updatedAt');
@@ -196,7 +195,7 @@ describe('Review-Product Service Event Integration', () => {
       expect(publishedEvents).toHaveLength(1);
       const publishedEvent = publishedEvents[0];
 
-      expect(publishedEvent.topic).toBe('review.deleted');
+      expect(publishedEvent.topic).toBe('review-events'); // Updated
       expect(publishedEvent.event.type).toBe('review.deleted');
 
       const eventData = publishedEvent.event.data;
@@ -205,11 +204,10 @@ describe('Review-Product Service Event Integration', () => {
         productId: deleteData.productId,
         userId: deleteData.userId,
         rating: 5,
-        verified: true,
+        isVerifiedPurchase: true, // Updated field name
       });
 
       expect(eventData).toHaveProperty('deletedAt');
-      expect(eventData.metadata.eventVersion).toBe('1.0');
     });
 
     it('should handle unverified review deletion', async () => {
@@ -224,7 +222,7 @@ describe('Review-Product Service Event Integration', () => {
       await eventPublisher.publishReviewDeleted(deleteData, 'test-corr');
 
       const eventData = publishedEvents[0].event.data;
-      expect(eventData.verified).toBe(false);
+      expect(eventData.isVerifiedPurchase).toBe(false); // Updated field name
       expect(eventData.rating).toBe(2);
     });
   });
@@ -261,6 +259,7 @@ describe('Review-Product Service Event Integration', () => {
         reviewId: 'test',
         productId: 'test',
         userId: 'test',
+        username: 'testuser',
         rating: 3,
         title: 'Test',
         comment: 'Test',
@@ -270,12 +269,11 @@ describe('Review-Product Service Event Integration', () => {
 
       await eventPublisher.publishReviewCreated(reviewData, 'test');
 
-      const eventData = publishedEvents[0].event.data;
-      expect(eventData.metadata).toMatchObject({
-        eventVersion: '1.0',
-        retryCount: 0,
-        source: 'review-service',
-        environment: expect.any(String),
+      const event = publishedEvents[0].event;
+      // Updated: metadata is at root level, not in data
+      expect(event.metadata).toMatchObject({
+        correlationId: expect.any(String),
+        userId: reviewData.userId,
       });
     });
   });
@@ -342,8 +340,8 @@ describe('Review-Product Service Event Integration', () => {
       expect(typeof eventData.rating).toBe('number');
       expect(eventData.rating).toBeGreaterThanOrEqual(1);
       expect(eventData.rating).toBeLessThanOrEqual(5);
-      expect(eventData).toHaveProperty('verified');
-      expect(typeof eventData.verified).toBe('boolean');
+      expect(eventData).toHaveProperty('isVerifiedPurchase'); // Updated field name
+      expect(typeof eventData.isVerifiedPurchase).toBe('boolean');
       expect(eventData).toHaveProperty('createdAt');
     });
 
@@ -384,7 +382,7 @@ describe('Review-Product Service Event Integration', () => {
 
       // Product service needs rating to subtract from aggregate
       expect(eventData).toHaveProperty('rating', 4);
-      expect(eventData).toHaveProperty('verified', true);
+      expect(eventData).toHaveProperty('isVerifiedPurchase', true); // Updated field name
     });
   });
 });
