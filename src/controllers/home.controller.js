@@ -18,7 +18,8 @@ export const info = (req, res) => {
       liveness: '/health/live',
       metrics: '/metrics',
     },
-    correlationId: req.correlationId,
+    traceId: req.traceId,
+    spanId: req.spanId,
   });
 };
 

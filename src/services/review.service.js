@@ -9,8 +9,8 @@ class ReviewService {
   /**
    * Create a new review
    */
-  async createReview(reviewData, user, correlationId) {
-    const log = logger.withCorrelationId(correlationId);
+  async createReview(reviewData, user, traceId, spanId) {
+    const log = logger.withTraceContext(traceId, spanId);
 
     // Check if user already reviewed this product
     const existingReview = await Review.findOne({
@@ -23,7 +23,7 @@ class ReviewService {
     }
 
     // Validate product exists
-    await this.validateProduct(reviewData.productId, correlationId);
+    await this.validateProduct(reviewData.productId, traceId, spanId);
 
     // Validate purchase if order reference provided
     let isVerifiedPurchase = false;
@@ -32,7 +32,8 @@ class ReviewService {
         user.userId,
         reviewData.productId,
         reviewData.orderReference,
-        correlationId
+        traceId,
+        spanId
       );
     }
 
@@ -58,7 +59,7 @@ class ReviewService {
 
     // Publish event via Dapr - Product service will update rating aggregate
     try {
-      await eventPublisher.publishReviewCreated(savedReview, correlationId);
+      await eventPublisher.publishReviewCreated(savedReview, traceId, spanId);
       log.info('Review created event published', {
         reviewId: savedReview._id,
         productId: reviewData.productId,
@@ -86,7 +87,7 @@ class ReviewService {
   /**
    * Get reviews for a product with filtering and pagination
    */
-  async getProductReviews(productId, options = {}, correlationId) {
+  async getProductReviews(productId, options = {}, traceId, spanId) {
     const {
       page = 1,
       limit = 20,
@@ -182,7 +183,7 @@ class ReviewService {
   /**
    * Update a review
    */
-  async updateReview(reviewId, userId, updateData, correlationId) {
+  async updateReview(reviewId, userId, updateData, traceId, spanId) {
     const review = await Review.findById(reviewId);
     if (!review) {
       throw new ErrorResponse('Review not found', 404);
@@ -215,15 +216,17 @@ class ReviewService {
 
     // Publish event
     try {
-      await eventPublisher.publishReviewUpdated(updatedReview, previousRating, correlationId);
-      logger.info('Review updated event published', {
+      await eventPublisher.publishReviewUpdated(updatedReview, previousRating, traceId, spanId);
+      const log = logger.withTraceContext(traceId, spanId);
+      log.info('Review updated event published', {
         reviewId: updatedReview._id,
         productId: updatedReview.productId,
         previousRating,
         newRating: updatedReview.rating,
       });
     } catch (eventError) {
-      logger.error('Failed to publish review.updated event', {
+      const log = logger.withTraceContext(traceId, spanId);
+      log.error('Failed to publish review.updated event', {
         error: eventError.message,
         reviewId: updatedReview._id,
       });
@@ -235,7 +238,7 @@ class ReviewService {
   /**
    * Delete a review
    */
-  async deleteReview(reviewId, userId, correlationId) {
+  async deleteReview(reviewId, userId, traceId, spanId) {
     const review = await Review.findById(reviewId);
     if (!review) {
       throw new ErrorResponse('Review not found', 404);
@@ -249,14 +252,16 @@ class ReviewService {
 
     // Publish event
     try {
-      await eventPublisher.publishReviewDeleted(review, correlationId);
-      logger.info('Review deleted event published', {
+      await eventPublisher.publishReviewDeleted(review, traceId, spanId);
+      const log = logger.withTraceContext(traceId, spanId);
+      log.info('Review deleted event published', {
         reviewId,
         productId: review.productId,
         userId: review.userId,
       });
     } catch (eventError) {
-      logger.error('Failed to publish review.deleted event', {
+      const log = logger.withTraceContext(traceId, spanId);
+      log.error('Failed to publish review.deleted event', {
         error: eventError.message,
         reviewId,
       });
@@ -268,7 +273,7 @@ class ReviewService {
   /**
    * Vote on review helpfulness
    */
-  async voteOnReview(reviewId, userId, voteType, correlationId) {
+  async voteOnReview(reviewId, userId, voteType, traceId, spanId) {
     if (!['helpful', 'notHelpful'].includes(voteType)) {
       throw new ErrorResponse('Vote must be either "helpful" or "notHelpful"', 400);
     }
@@ -315,7 +320,7 @@ class ReviewService {
   /**
    * Get user's reviews
    */
-  async getUserReviews(userId, options, correlationId) {
+  async getUserReviews(userId, options, traceId, spanId) {
     const { page = 1, limit = 10, sort = 'newest', status = null } = options;
 
     const filter = { userId };
@@ -354,7 +359,7 @@ class ReviewService {
   /**
    * Get review by ID
    */
-  async getReviewById(reviewId, userId = null, correlationId) {
+  async getReviewById(reviewId, userId = null, traceId, spanId) {
     const review = await Review.findById(reviewId).lean();
     if (!review) {
       throw new ErrorResponse('Review not found', 404);
@@ -397,14 +402,15 @@ class ReviewService {
   /**
    * Validate product exists via Dapr
    */
-  async validateProduct(productId, correlationId) {
+  async validateProduct(productId, traceId, spanId) {
     try {
+      const traceparent = `00-${traceId}-${spanId}-01`;
       const response = await eventPublisher.client.invoker.invoke(
         'product-service',
         `api/products/internal/${productId}/exists`,
         'GET',
         null,
-        { 'X-Correlation-ID': correlationId }
+        { traceparent: traceparent }
       );
 
       if (!response.exists) {
@@ -415,7 +421,8 @@ class ReviewService {
       if (error.message?.includes('404') || error.message?.includes('not found')) {
         throw new ErrorResponse('Product not found', 404);
       }
-      logger.error('Error validating product:', error);
+      const log = logger.withTraceContext(traceId, spanId);
+      log.error('Error validating product:', error);
       return true; // Don't fail review creation if service is down
     }
   }
@@ -423,18 +430,20 @@ class ReviewService {
   /**
    * Validate purchase via Dapr
    */
-  async validatePurchase(userId, productId, orderReference, correlationId) {
+  async validatePurchase(userId, productId, orderReference, traceId, spanId) {
     try {
+      const traceparent = `00-${traceId}-${spanId}-01`;
       const response = await eventPublisher.client.invoker.invoke(
         'order-service',
         'api/v1/internal/orders/validate-purchase',
         'POST',
         { userId, productId, orderReference },
-        { 'X-Correlation-ID': correlationId }
+        { traceparent: traceparent }
       );
       return response.isValid || false;
     } catch (error) {
-      logger.error('Error validating purchase:', error);
+      const log = logger.withTraceContext(traceId, spanId);
+      log.error('Error validating purchase:', error);
       return false;
     }
   }
@@ -442,7 +451,7 @@ class ReviewService {
   /**
    * Get internal statistics for admin
    */
-  async getInternalStats(correlationId) {
+  async getInternalStats(traceId, spanId) {
     const [totalReviews, pendingReviews, approvedReviews] = await Promise.all([
       Review.countDocuments({}),
       Review.countDocuments({ status: 'pending' }),
@@ -487,7 +496,7 @@ class ReviewService {
   /**
    * Get all reviews for admin with filtering
    */
-  async getAllReviewsForAdmin(options, correlationId) {
+  async getAllReviewsForAdmin(options, traceId, spanId) {
     const { status, rating, search, page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = options;
 
     const filter = {};
@@ -523,7 +532,7 @@ class ReviewService {
   /**
    * Bulk delete reviews (admin only)
    */
-  async bulkDeleteReviews(reviewIds, user, correlationId) {
+  async bulkDeleteReviews(reviewIds, user, traceId, spanId) {
     const result = await Review.deleteMany({
       _id: { $in: reviewIds },
     });
@@ -536,7 +545,7 @@ class ReviewService {
   /**
    * Handle product deletion
    */
-  async handleProductDeletion(productId, deleteReviews = true, correlationId) {
+  async handleProductDeletion(productId, deleteReviews = true, traceId, spanId) {
     if (deleteReviews) {
       const deleteResult = await Review.deleteMany({ productId });
       return {

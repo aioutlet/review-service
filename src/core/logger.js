@@ -9,34 +9,51 @@ const LOG_FORMAT = process.env.LOG_FORMAT || (IS_PRODUCTION ? 'json' : 'console'
 /**
  * Console formatter for development
  */
-const consoleFormat = winston.format.printf(({ level, message, timestamp, correlationId, ...meta }) => {
-  const colors = {
-    error: '\x1b[31m',
-    warn: '\x1b[33m',
-    info: '\x1b[32m',
-    debug: '\x1b[34m',
-  };
-  const reset = '\x1b[0m';
-  const color = colors[level] || '';
+const consoleFormat = winston.format.printf(
+  ({ level, message, timestamp, traceId, spanId, correlationId, ...meta }) => {
+    const colors = {
+      error: '\x1b[31m',
+      warn: '\x1b[33m',
+      info: '\x1b[32m',
+      debug: '\x1b[34m',
+    };
+    const reset = '\x1b[0m';
+    const color = colors[level] || '';
 
-  const corrId = correlationId ? `[${correlationId}]` : '[no-correlation]';
-  const metaStr = Object.keys(meta).length > 0 ? ` | ${JSON.stringify(meta)}` : '';
+    // Prefer W3C trace context, fallback to correlationId for backward compatibility
+    const traceInfo =
+      traceId && spanId
+        ? `[${traceId.substring(0, 8)}...${spanId}]`
+        : correlationId
+        ? `[${correlationId}]`
+        : '[no-trace]';
 
-  return `${color}[${timestamp}] [${level.toUpperCase()}] ${NAME} ${corrId}: ${message}${metaStr}${reset}`;
-});
+    const metaStr = Object.keys(meta).length > 0 ? ` | ${JSON.stringify(meta)}` : '';
+
+    return `${color}[${timestamp}] [${level.toUpperCase()}] ${NAME} ${traceInfo}: ${message}${metaStr}${reset}`;
+  }
+);
 
 /**
  * JSON formatter for production
  */
-const jsonFormat = winston.format.printf(({ level, message, timestamp, correlationId, ...meta }) => {
-  return JSON.stringify({
+const jsonFormat = winston.format.printf(({ level, message, timestamp, traceId, spanId, correlationId, ...meta }) => {
+  const logEntry = {
     timestamp,
     level,
     service: NAME,
-    correlationId: correlationId || null,
     message,
     ...meta,
-  });
+  };
+
+  // Include W3C trace context if available
+  if (traceId) logEntry.traceId = traceId;
+  if (spanId) logEntry.spanId = spanId;
+
+  // Include legacy correlationId for backward compatibility
+  if (correlationId) logEntry.correlationId = correlationId;
+
+  return JSON.stringify(logEntry);
 });
 
 /**
@@ -115,7 +132,8 @@ class Logger {
   }
 
   /**
-   * Create a logger bound to a correlation ID
+   * Create a logger bound to a correlation ID (legacy support)
+   * @deprecated Use withTraceContext instead
    */
   withCorrelationId(correlationId) {
     return {
@@ -123,6 +141,21 @@ class Logger {
       info: (message, metadata = {}) => this.info(message, { ...metadata, correlationId }),
       warn: (message, metadata = {}) => this.warn(message, { ...metadata, correlationId }),
       error: (message, metadata = {}) => this.error(message, { ...metadata, correlationId }),
+    };
+  }
+
+  /**
+   * Create a logger bound to W3C Trace Context
+   * @param {string} traceId - W3C trace ID (32 hex chars)
+   * @param {string} spanId - W3C span ID (16 hex chars)
+   * @returns {Object} Logger with trace context bound to all methods
+   */
+  withTraceContext(traceId, spanId) {
+    return {
+      debug: (message, metadata = {}) => this.debug(message, { ...metadata, traceId, spanId }),
+      info: (message, metadata = {}) => this.info(message, { ...metadata, traceId, spanId }),
+      warn: (message, metadata = {}) => this.warn(message, { ...metadata, traceId, spanId }),
+      error: (message, metadata = {}) => this.error(message, { ...metadata, traceId, spanId }),
     };
   }
 }

@@ -6,7 +6,7 @@ import { asyncHandler } from '../middleware/asyncHandler.middleware.js';
  * Create a new review
  */
 export const createReview = asyncHandler(async (req, res) => {
-  const review = await reviewService.createReview(req.body, req.user, req.correlationId);
+  const review = await reviewService.createReview(req.body, req.user, req.traceId, req.spanId);
   res.status(201).json({
     success: true,
     message: 'Review created successfully',
@@ -28,7 +28,7 @@ export const getProductReviews = asyncHandler(async (req, res) => {
     search: req.query.search || null,
   };
 
-  const result = await reviewService.getProductReviews(productId, queryOptions, req.correlationId);
+  const result = await reviewService.getProductReviews(productId, queryOptions, req.traceId, req.spanId);
 
   res.status(200).json({
     success: true,
@@ -43,7 +43,7 @@ export const getProductReviews = asyncHandler(async (req, res) => {
 export const getReviewById = asyncHandler(async (req, res) => {
   const { reviewId } = req.params;
   const userId = req.user?.userId || null;
-  const review = await reviewService.getReviewById(reviewId, userId, req.correlationId);
+  const review = await reviewService.getReviewById(reviewId, userId, req.traceId, req.spanId);
 
   res.status(200).json({
     success: true,
@@ -57,7 +57,7 @@ export const getReviewById = asyncHandler(async (req, res) => {
  */
 export const updateReview = asyncHandler(async (req, res) => {
   const { reviewId } = req.params;
-  const review = await reviewService.updateReview(reviewId, req.user.userId, req.body, req.correlationId);
+  const review = await reviewService.updateReview(reviewId, req.user.userId, req.body, req.traceId, req.spanId);
   res.status(200).json({
     success: true,
     message: 'Review updated successfully',
@@ -70,7 +70,7 @@ export const updateReview = asyncHandler(async (req, res) => {
  */
 export const deleteReview = asyncHandler(async (req, res) => {
   const { reviewId } = req.params;
-  await reviewService.deleteReview(reviewId, req.user.userId, req.correlationId);
+  await reviewService.deleteReview(reviewId, req.user.userId, req.traceId, req.spanId);
   res.status(200).json({
     success: true,
     message: 'Review deleted successfully',
@@ -83,7 +83,7 @@ export const deleteReview = asyncHandler(async (req, res) => {
 export const voteOnReview = asyncHandler(async (req, res) => {
   const { reviewId } = req.params;
   const { voteType } = req.body;
-  const result = await reviewService.voteOnReview(reviewId, req.user.userId, voteType, req.correlationId);
+  const result = await reviewService.voteOnReview(reviewId, req.user.userId, voteType, req.traceId, req.spanId);
 
   res.status(200).json({
     success: true,
@@ -103,7 +103,7 @@ export const getUserReviews = asyncHandler(async (req, res) => {
     status: req.query.status || null,
   };
 
-  const result = await reviewService.getUserReviews(req.user.userId, queryOptions, req.correlationId);
+  const result = await reviewService.getUserReviews(req.user.userId, queryOptions, req.traceId, req.spanId);
 
   res.status(200).json({
     success: true,
@@ -116,7 +116,7 @@ export const getUserReviews = asyncHandler(async (req, res) => {
  * Get internal review stats (admin only)
  */
 export const getStats = asyncHandler(async (req, res) => {
-  const stats = await reviewService.getInternalStats(req.correlationId);
+  const stats = await reviewService.getInternalStats(req.traceId, req.spanId);
 
   res.status(200).json({
     success: true,
@@ -141,7 +141,8 @@ export const getAllReviews = asyncHandler(async (req, res) => {
       sortBy,
       sortOrder,
     },
-    req.correlationId
+    req.traceId,
+    req.spanId
   );
 
   res.status(200).json({

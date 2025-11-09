@@ -4,7 +4,7 @@ import cors from 'cors';
 import config from './core/config.js';
 import { logger } from './core/logger.js';
 import connectDB from './database/database.js';
-import correlationIdMiddleware from './middleware/correlationId.middleware.js';
+import traceContextMiddleware from './middleware/traceContext.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import reviewRoutes from './routes/review.routes.js';
 import adminRoutes from './routes/admin.routes.js';
@@ -23,7 +23,7 @@ app.use(
   })
 );
 
-app.use(correlationIdMiddleware);
+app.use(traceContextMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
