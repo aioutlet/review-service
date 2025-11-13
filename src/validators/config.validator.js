@@ -1,132 +1,199 @@
 /**
- * Configuration Validator for Review Service
- * Validates application configuration for completeness and production readiness
+ * Configuration Validator
+ * Validates all required environment variables at application startup
+ * Fails fast if any configuration is missing or invalid
+ *
+ * NOTE: This module MUST NOT import logger, as the logger depends on validated config.
+ * Uses console.log for validation messages.
  */
 
 /**
- * Validate application configuration
- * @param {Object} config - The configuration object to validate
- * @throws {Error} If configuration validation fails
+ * Configuration validation rules
  */
-export const validateConfig = (config) => {
+const validationRules = {
+  // Server Configuration
+  NODE_ENV: {
+    required: true,
+    validator: (value) => ['development', 'production', 'test', 'staging'].includes(value?.toLowerCase()),
+    errorMessage: 'NODE_ENV must be one of: development, production, test, staging',
+  },
+  PORT: {
+    required: true,
+    validator: (value) => {
+      const port = parseInt(value, 10);
+      return !isNaN(port) && port > 0 && port <= 65535;
+    },
+    errorMessage: 'PORT must be a valid port number (1-65535)',
+  },
+  NAME: {
+    required: true,
+    validator: (value) => value && value.length > 0,
+    errorMessage: 'NAME must be a non-empty string',
+  },
+  VERSION: {
+    required: true,
+    validator: (value) => value && /^\d+\.\d+\.\d+/.test(value),
+    errorMessage: 'VERSION must be in semantic version format (e.g., 1.0.0)',
+  },
+
+  // Database Configuration - Individual MongoDB variables
+  MONGO_INITDB_ROOT_USERNAME: {
+    required: true,
+    validator: (value) => value && value.length > 0,
+    errorMessage: 'MONGO_INITDB_ROOT_USERNAME must be a non-empty string',
+  },
+  MONGO_INITDB_ROOT_PASSWORD: {
+    required: true,
+    validator: (value) => value && value.length > 0,
+    errorMessage: 'MONGO_INITDB_ROOT_PASSWORD must be a non-empty string',
+  },
+  MONGO_INITDB_DATABASE: {
+    required: true,
+    validator: (value) => value && value.length > 0,
+    errorMessage: 'MONGO_INITDB_DATABASE must be a non-empty string',
+  },
+  MONGODB_HOST: {
+    required: false,
+    validator: (value) => !value || value.length > 0,
+    errorMessage: 'MONGODB_HOST must be a non-empty string if provided',
+    default: 'localhost',
+  },
+  MONGODB_PORT: {
+    required: false,
+    validator: (value) => {
+      if (!value) return true;
+      const port = parseInt(value, 10);
+      return !isNaN(port) && port > 0 && port <= 65535;
+    },
+    errorMessage: 'MONGODB_PORT must be a valid port number if provided',
+    default: '27017',
+  },
+  MONGODB_AUTH_SOURCE: {
+    required: false,
+    validator: (value) => !value || value.length > 0,
+    errorMessage: 'MONGODB_AUTH_SOURCE must be a non-empty string if provided',
+    default: 'admin',
+  },
+
+  // Dapr Configuration
+  DAPR_HTTP_PORT: {
+    required: false,
+    validator: (value) => !value || (Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 65535),
+    errorMessage: 'DAPR_HTTP_PORT must be a valid port number (1-65535)',
+  },
+  DAPR_HOST: {
+    required: false,
+    validator: (value) => !value || (typeof value === 'string' && value.length > 0),
+    errorMessage: 'DAPR_HOST must be a non-empty string',
+  },
+  DAPR_PUBSUB_NAME: {
+    required: false,
+    validator: (value) => !value || (typeof value === 'string' && value.length > 0),
+    errorMessage: 'DAPR_PUBSUB_NAME must be a non-empty string',
+  },
+  DAPR_APP_ID: {
+    required: false,
+    validator: (value) => !value || (typeof value === 'string' && value.length > 0),
+    errorMessage: 'DAPR_APP_ID must be a non-empty string',
+  },
+
+  // Security Configuration
+  JWT_SECRET: {
+    required: true,
+    validator: (value) => value && value.length >= 32,
+    errorMessage: 'JWT_SECRET must be at least 32 characters long',
+  },
+
+  // Logging Configuration
+  LOG_LEVEL: {
+    required: false,
+    validator: (value) => {
+      const validLevels = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
+      return validLevels.includes(value?.toLowerCase());
+    },
+    errorMessage: 'LOG_LEVEL must be one of: error, warn, info, http, verbose, debug, silly',
+    default: 'info',
+  },
+  LOG_FORMAT: {
+    required: false,
+    validator: (value) => !value || ['json', 'console'].includes(value?.toLowerCase()),
+    errorMessage: 'LOG_FORMAT must be either json or console',
+    default: 'console',
+  },
+  LOG_TO_CONSOLE: {
+    required: false,
+    validator: (value) => ['true', 'false'].includes(value?.toLowerCase()),
+    errorMessage: 'LOG_TO_CONSOLE must be true or false',
+    default: 'true',
+  },
+  LOG_TO_FILE: {
+    required: false,
+    validator: (value) => ['true', 'false'].includes(value?.toLowerCase()),
+    errorMessage: 'LOG_TO_FILE must be true or false',
+    default: 'false',
+  },
+  LOG_FILE_PATH: {
+    required: false,
+    validator: (value) => !value || (value.length > 0 && value.includes('.')),
+    errorMessage: 'LOG_FILE_PATH must be a valid file path with extension',
+    default: './logs/review-service.log',
+  },
+};
+
+/**
+ * Validates all environment variables according to the rules
+ * @throws {Error} - If any required variable is missing or invalid
+ */
+const validateConfig = () => {
   const errors = [];
   const warnings = [];
 
-  // === Database Configuration ===
-  // Note: All database configuration is managed by Dapr Secret Manager
-  // No validation needed in config.js
+  console.log('[CONFIG] Validating environment configuration...');
 
-  // === Security Configuration ===
-  // Note: JWT secrets are managed by Dapr Secret Manager
-  // We only validate CORS and other non-sensitive security settings here
-  if (config.security?.corsOrigin && Array.isArray(config.security.corsOrigin)) {
-    const invalidOrigins = config.security.corsOrigin.filter((origin) => {
-      if (origin === '*') return false; // Wildcard is valid
-      try {
-        new URL(origin);
-        return false;
-      } catch {
-        return true;
-      }
-    });
+  // Validate each rule
+  for (const [key, rule] of Object.entries(validationRules)) {
+    const value = process.env[key];
 
-    if (invalidOrigins.length > 0) {
-      errors.push(`Invalid CORS origins: ${invalidOrigins.join(', ')}`);
+    // Check if required variable is missing
+    if (rule.required && !value) {
+      errors.push(`❌ ${key} is required but not set`);
+      continue;
     }
 
-    // Production should not allow wildcard CORS
-    if (config.env === 'production' && config.security.corsOrigin.includes('*')) {
-      errors.push('CORS_ORIGIN should not include wildcard (*) in production');
+    // Skip validation if value is not set and not required
+    if (!value && !rule.required) {
+      if (rule.default) {
+        warnings.push(`⚠️  ${key} not set, using default: ${rule.default}`);
+        process.env[key] = rule.default;
+      }
+      continue;
+    }
+
+    // Validate the value
+    if (value && rule.validator && !rule.validator(value)) {
+      errors.push(`❌ ${key}: ${rule.errorMessage}`);
+      if (value.length > 100) {
+        errors.push(`   Current value: ${value.substring(0, 100)}...`);
+      } else {
+        errors.push(`   Current value: ${value}`);
+      }
     }
   }
 
-  // === Logging Configuration ===
-  const validLogLevels = ['error', 'warn', 'info', 'debug'];
-  if (config.logging?.level && !validLogLevels.includes(config.logging.level)) {
-    errors.push(`Log level must be one of: ${validLogLevels.join(', ')}`);
-  }
-
-  if (config.env === 'production' && config.logging?.level === 'debug') {
-    warnings.push('LOG_LEVEL should not be debug in production');
-  }
-
-  // === Server Configuration ===
-  if (!config.server?.port) {
-    errors.push('Server port is not configured');
-  }
-
-  if (!config.server?.host) {
-    warnings.push('Server host is not configured - using default');
-  }
-
-  // === Dapr Configuration ===
-  if (!config.dapr?.httpPort) {
-    warnings.push('Dapr HTTP port is not configured - using default');
-  }
-
-  if (!config.dapr?.pubsubName) {
-    warnings.push('Dapr pubsub name is not configured - using default');
-  }
-
-  if (!config.dapr?.appId) {
-    warnings.push('Dapr app ID is not configured - using default');
-  }
-
-  // Report results
+  // Log warnings
   if (warnings.length > 0) {
-    console.warn('⚠️  Configuration warnings:');
-    warnings.forEach((warning) => {
-      console.warn(`   - ${warning}`);
-    });
+    warnings.forEach((warning) => console.warn(warning));
   }
 
+  // If there are errors, log them and throw
   if (errors.length > 0) {
-    throw new Error(`Configuration validation failed:\n${errors.map((err) => `  - ${err}`).join('\n')}`);
+    console.error('[CONFIG] ❌ Configuration validation failed:');
+    errors.forEach((error) => console.error(error));
+    console.error('\n💡 Please check your .env file and ensure all required variables are set correctly.');
+    throw new Error(`Configuration validation failed with ${errors.length} error(s)`);
   }
 
-  console.log('✅ Review service configuration validation passed');
-  if (warnings.length > 0) {
-    console.log(`⚠️  ${warnings.length} warning(s) found - review configuration for optimal setup`);
-  }
+  console.log('[CONFIG] ✅ All required environment variables are valid');
 };
 
-/**
- * Validates environment-specific configuration
- * @param {string} environment - The environment (development, production, test)
- * @param {Object} config - The configuration object
- */
-export const validateEnvironmentConfig = (environment, config) => {
-  const errors = [];
-
-  switch (environment) {
-    case 'production':
-      // Production-specific validations
-      if (config.logging?.level === 'debug') {
-        errors.push('Debug logging should not be enabled in production');
-      }
-      if (config.security?.corsOrigin?.includes('*')) {
-        errors.push('Wildcard CORS should not be allowed in production');
-      }
-      break;
-
-    case 'test':
-      // Test-specific validations
-      // Note: Test database config is managed by Dapr Secret Manager
-      break;
-
-    case 'development':
-      // Development-specific recommendations
-      break;
-  }
-
-  if (errors.length > 0) {
-    throw new Error(
-      `Environment-specific validation failed for ${environment}:\n${errors.map((err) => `  - ${err}`).join('\n')}`
-    );
-  }
-};
-
-export default {
-  validateConfig,
-  validateEnvironmentConfig,
-};
+export default validateConfig;
