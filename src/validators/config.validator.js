@@ -37,21 +37,8 @@ const validationRules = {
   },
 
   // Database Configuration - Individual MongoDB variables
-  MONGO_INITDB_ROOT_USERNAME: {
-    required: true,
-    validator: (value) => value && value.length > 0,
-    errorMessage: 'MONGO_INITDB_ROOT_USERNAME must be a non-empty string',
-  },
-  MONGO_INITDB_ROOT_PASSWORD: {
-    required: true,
-    validator: (value) => value && value.length > 0,
-    errorMessage: 'MONGO_INITDB_ROOT_PASSWORD must be a non-empty string',
-  },
-  MONGO_INITDB_DATABASE: {
-    required: true,
-    validator: (value) => value && value.length > 0,
-    errorMessage: 'MONGO_INITDB_DATABASE must be a non-empty string',
-  },
+  // NOTE: These are fetched from Dapr Secret Store at runtime via getDatabaseConfig()
+  // Not validated here as they're not in process.env
   MONGODB_HOST: {
     required: false,
     validator: (value) => !value || value.length > 0,
@@ -98,11 +85,8 @@ const validationRules = {
   },
 
   // Security Configuration
-  JWT_SECRET: {
-    required: true,
-    validator: (value) => value && value.length >= 32,
-    errorMessage: 'JWT_SECRET must be at least 32 characters long',
-  },
+  // NOTE: JWT_SECRET is fetched from Dapr Secret Store at runtime via getJwtConfig()
+  // Not validated here as it's not in process.env
 
   // Logging Configuration
   LOG_LEVEL: {
