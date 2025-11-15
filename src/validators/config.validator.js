@@ -35,34 +35,6 @@ const validationRules = {
     validator: (value) => value && /^\d+\.\d+\.\d+/.test(value),
     errorMessage: 'VERSION must be in semantic version format (e.g., 1.0.0)',
   },
-
-  // Database Configuration - Individual MongoDB variables
-  // NOTE: These are fetched from Dapr Secret Store at runtime via getDatabaseConfig()
-  // Not validated here as they're not in process.env
-  MONGODB_HOST: {
-    required: false,
-    validator: (value) => !value || value.length > 0,
-    errorMessage: 'MONGODB_HOST must be a non-empty string if provided',
-    default: 'localhost',
-  },
-  MONGODB_PORT: {
-    required: false,
-    validator: (value) => {
-      if (!value) return true;
-      const port = parseInt(value, 10);
-      return !isNaN(port) && port > 0 && port <= 65535;
-    },
-    errorMessage: 'MONGODB_PORT must be a valid port number if provided',
-    default: '27017',
-  },
-  MONGODB_AUTH_SOURCE: {
-    required: false,
-    validator: (value) => !value || value.length > 0,
-    errorMessage: 'MONGODB_AUTH_SOURCE must be a non-empty string if provided',
-    default: 'admin',
-  },
-
-  // Dapr Configuration
   DAPR_HTTP_PORT: {
     required: false,
     validator: (value) => !value || (Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 65535),
@@ -83,12 +55,6 @@ const validationRules = {
     validator: (value) => !value || (typeof value === 'string' && value.length > 0),
     errorMessage: 'DAPR_APP_ID must be a non-empty string',
   },
-
-  // Security Configuration
-  // NOTE: JWT_SECRET is fetched from Dapr Secret Store at runtime via getJwtConfig()
-  // Not validated here as it's not in process.env
-
-  // Logging Configuration
   LOG_LEVEL: {
     required: false,
     validator: (value) => {
