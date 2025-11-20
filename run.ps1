@@ -2,6 +2,8 @@
 # Run Review Service with Dapr sidecar
 # Usage: .\run.ps1
 
+$Host.UI.RawUI.WindowTitle = "Review Service"
+
 Write-Host "Starting Review Service with Dapr..." -ForegroundColor Green
 Write-Host "Service will be available at: http://localhost:1010" -ForegroundColor Cyan
 Write-Host "Dapr HTTP endpoint: http://localhost:3510" -ForegroundColor Cyan

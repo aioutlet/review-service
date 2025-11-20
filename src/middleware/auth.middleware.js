@@ -43,7 +43,8 @@ export const verifyToken = async (req, res, next) => {
 
     const jwtCfg = await getJwtConfig();
     const decoded = jwt.verify(token, jwtCfg.secret, {
-      audience: 'aioutlet-platform', // Verify audience matches auth-service
+      issuer: jwtCfg.issuer,
+      audience: jwtCfg.audience
     });
 
     // Add user information to request
@@ -97,7 +98,7 @@ export const verifyToken = async (req, res, next) => {
  * @param {Object} res - Express response object
  * @param {Function} next - Next middleware function
  */
-export const optionalAuth = (req, res, next) => {
+export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -114,7 +115,11 @@ export const optionalAuth = (req, res, next) => {
       return next();
     }
 
-    const decoded = jwt.verify(token, config.security.jwtSecret);
+    const jwtCfg = await getJwtConfig();
+    const decoded = jwt.verify(token, jwtCfg.secret, {
+      issuer: jwtCfg.issuer,
+      audience: jwtCfg.audience
+    });
 
     req.user = {
       userId: decoded.userId || decoded.sub,
@@ -273,7 +278,7 @@ export const requireOwnership = (resourceField = 'userId', paramName = 'userId')
  * @param {Object} res - Express response object
  * @param {Function} next - Next middleware function
  */
-export const extractUserId = (req, res, next) => {
+export const extractUserId = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -282,7 +287,11 @@ export const extractUserId = (req, res, next) => {
 
       if (token) {
         try {
-          const decoded = jwt.verify(token, config.security.jwtSecret);
+          const jwtCfg = await getJwtConfig();
+          const decoded = jwt.verify(token, jwtCfg.secret, {
+            issuer: jwtCfg.issuer,
+            audience: jwtCfg.audience
+          });
           req.userId = decoded.userId || decoded.sub;
         } catch (error) {
           // Token invalid, but we don't fail - just don't set userId
