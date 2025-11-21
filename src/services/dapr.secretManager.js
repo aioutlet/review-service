@@ -101,15 +101,29 @@ class DaprSecretManager {
   }
 
   /**
-   * Get JWT configuration from secrets or environment variables
+   * Get JWT configuration from Dapr secrets and environment
+   * Only JWT_SECRET is truly secret - algorithm and expiration are just config
    * @returns {Promise<Object>} JWT configuration parameters
    */
   async getJwtConfig() {
-    const [secret, algorithm] = await Promise.all([this.getSecret('JWT_SECRET'), this.getSecret('JWT_ALGORITHM')]);
+    const secret = await this.getSecret('JWT_SECRET');
+
+    if (!secret) {
+      throw new Error('JWT_SECRET not found in Dapr secret store');
+    }
+
+    // Algorithm and expiration from environment variables (not secrets)
+    const algorithm = process.env.JWT_ALGORITHM || 'HS256';
+    const expiration = parseInt(process.env.JWT_EXPIRATION || '3600', 10);
+    const issuer = process.env.JWT_ISSUER || 'auth-service';
+    const audience = process.env.JWT_AUDIENCE || 'aioutlet-platform';
 
     return {
-      secret: secret || 'your-secret-key',
-      algorithm: algorithm || 'HS256',
+      secret,
+      algorithm,
+      expiration,
+      issuer,
+      audience,
     };
   }
 }
