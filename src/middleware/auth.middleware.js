@@ -60,11 +60,11 @@ export const verifyToken = async (req, res, next) => {
     };
 
     // Log authentication success
-    logger.debug('User authenticated successfully', {
-      userId: req.user.userId,
-      username: req.user.username,
-      correlationId: req.correlationId,
-    });
+    // logger.debug('User authenticated successfully', {
+    //   userId: req.user.userId,
+    //   username: req.user.username,
+    //   correlationId: req.correlationId,
+    // });
 
     next();
   } catch (error) {
